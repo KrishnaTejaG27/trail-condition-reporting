@@ -8,12 +8,12 @@ function ReportForm({ trail, userLocation, onClose, onSubmit }) {
   const [submitting, setSubmitting] = useState(false);
 
   const hazardTypes = [
-    { id: 'Mud', label: 'Mud / Slippery', icon: '🟤', color: '#8B4513' },
-    { id: 'Flooding', label: 'Water / Flooding', icon: '💧', color: '#0066cc' },
-    { id: 'Obstruction', label: 'Obstruction', icon: '🚧', color: '#ff8c00' },
-    { id: 'Ice/Snow', label: 'Ice / Snow', icon: '❄️', color: '#87CEEB' },
-    { id: 'Closed', label: 'Trail Closed', icon: '🚫', color: '#dc3545' },
-    { id: 'Other', label: 'Other', icon: '⚠️', color: '#6c757d' }
+    { id: 'mud', label: 'Mud / Slippery', icon: '💩', color: '#8B4513' },
+    { id: 'flooding', label: 'Water / Flooding', icon: '💧', color: '#0066cc' },
+    { id: 'ice', label: 'Ice / Snow', icon: '❄️', color: '#87CEEB' },
+    { id: 'fallen_tree', label: 'Fallen Tree / Obstruction', icon: '🌳', color: '#ff8c00' },
+    { id: 'closed_trail', label: 'Trail Closed', icon: '🚫', color: '#dc3545' },
+    { id: 'other', label: 'Other', icon: '⚠️', color: '#6c757d' }
   ];
 
   const handleImageChange = (e) => {
@@ -67,15 +67,8 @@ function ReportForm({ trail, userLocation, onClose, onSubmit }) {
   };
 
   const getTimeEstimate = () => {
-    const times = {
-      'Mud': '24 hours',
-      'Flooding': '12-24 hours',
-      'Ice/Snow': '48 hours',
-      'Obstruction': '72 hours',
-      'Closed': '7 days',
-      'Other': '24 hours'
-    };
-    return times[hazardType] || '24 hours';
+    // PRD: All reports expire after 48 hours
+    return '48 hours';
   };
 
   return (
@@ -134,7 +127,7 @@ function ReportForm({ trail, userLocation, onClose, onSubmit }) {
             </div>
 
             <div className="form-group">
-              <label>Photo {hazardType === 'Flooding' || hazardType === 'Closed' ? '(Recommended)' : '(Optional)'}</label>
+              <label>Photo (Optional)</label>
               <div className="image-upload" onClick={() => document.getElementById('image-input').click()}>
                 <input
                   type="file"

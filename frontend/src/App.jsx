@@ -5,11 +5,15 @@ import ReportForm from './components/ReportForm';
 import Login from './components/Login';
 import AdminPanel from './components/AdminPanel';
 import AlertBanner from './components/AlertBanner';
+import UserProfile from './components/UserProfile';
+import UserReports from './components/UserReports';
 import './App.css';
 
 function App() {
   const [user, setUser] = useState(null);
   const [showReportForm, setShowReportForm] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [showUserReports, setShowUserReports] = useState(false);
   const [selectedTrail, setSelectedTrail] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
@@ -44,6 +48,37 @@ function App() {
       fetchAlerts();
     }
   }, [user, userLocation]);
+
+  // PRD Section 7.1: Token refresh mechanism - refresh every 23 hours
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshToken = async () => {
+      try {
+        const response = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          localStorage.setItem('token', data.token);
+        } else {
+          // Token refresh failed, logout user
+          handleLogout();
+        }
+      } catch (err) {
+        console.error('Token refresh error:', err);
+      }
+    };
+
+    // Refresh token every 23 hours (token expires in 24 hours)
+    const refreshInterval = setInterval(refreshToken, 23 * 60 * 60 * 1000);
+    
+    return () => clearInterval(refreshInterval);
+  }, [user]);
 
   const fetchAlerts = async () => {
     try {
@@ -87,7 +122,12 @@ function App() {
           <nav className="nav">
             {user ? (
               <>
-                <span className="user-info">{user.email}</span>
+                <button onClick={() => setShowUserProfile(true)} className="btn btn-secondary" style={{ marginRight: '10px' }}>
+                  👤 Profile
+                </button>
+                <button onClick={() => setShowUserReports(true)} className="btn btn-secondary" style={{ marginRight: '10px' }}>
+                  📋 My Reports
+                </button>
                 <button onClick={handleLogout} className="btn btn-secondary">
                   Logout
                 </button>
@@ -137,6 +177,14 @@ function App() {
               fetchAlerts();
             }}
           />
+        )}
+
+        {showUserProfile && (
+          <UserProfile onClose={() => setShowUserProfile(false)} />
+        )}
+
+        {showUserReports && (
+          <UserReports onClose={() => setShowUserReports(false)} />
         )}
 
         {user && (

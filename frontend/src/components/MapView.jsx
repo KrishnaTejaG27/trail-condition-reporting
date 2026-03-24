@@ -32,7 +32,17 @@ function MapView({ user, userLocation, onReportClick }) {
       fetchReports();
     });
 
-    return () => map.current.remove();
+    // PRD MVP: Poll backend every 30 seconds for real-time updates
+    const pollInterval = setInterval(() => {
+      if (map.current) {
+        fetchReports();
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(pollInterval);
+      map.current.remove();
+    };
   }, [userLocation]);
 
   const fetchTrails = async () => {
@@ -124,10 +134,10 @@ function MapView({ user, userLocation, onReportClick }) {
       let color = '#ffc107'; // default caution
       let size = '16px';
       
-      if (report.hazard_type === 'Closed' || report.hazard_type === 'Flooding') {
+      if (report.hazard_type === 'closed_trail' || report.hazard_type === 'flooding') {
         color = '#dc3545'; // danger
         size = '18px';
-      } else if (report.trust_score >= 5) {
+      } else if (report.upvotes >= 3) {
         color = '#28a745'; // high confidence
       }
 
@@ -142,24 +152,26 @@ function MapView({ user, userLocation, onReportClick }) {
         animation: pulse 2s infinite;
       `;
 
+      const confidenceLevel = report.upvotes >= 3 ? 'high' : report.upvotes >= 1 ? 'medium' : 'low';
+      const confidenceLabel = report.upvotes >= 3 ? '✅ High Confidence' : report.upvotes >= 1 ? '⚠️ Medium Confidence' : '❓ Low Confidence';
+
       const popup = new mapboxgl.Popup({ offset: 10 }).setHTML(`
         <div class="trail-popup">
           <h3>${report.hazard_type}</h3>
           <p>${report.description || 'No description'}</p>
           ${report.image_url ? `<img src="${report.image_url}" style="max-width: 200px; border-radius: 4px; margin: 8px 0;" />` : ''}
           <div style="font-size: 12px; color: #666; margin-top: 8px;">
-            <span class="confidence-${getConfidenceLevel(report.trust_score)}">
-              ${getConfidenceLabel(report.trust_score)}
+            <span class="confidence-${confidenceLevel}">
+              ${confidenceLabel}
             </span>
             <br/>
-            <span>👍 ${report.upvotes} 👎 ${report.downvotes}</span>
+            <span>👍 ${report.upvotes} confirms</span>
             <br/>
             <span>Expires: ${new Date(report.expires_at).toLocaleDateString()}</span>
           </div>
           ${user ? `
-            <div style="margin-top: 12px; display: flex; gap: 8px;">
-              <button class="btn-small btn-primary" onclick="window.voteReport(${report.id}, 'up')">👍 Confirm</button>
-              <button class="btn-small btn-secondary" onclick="window.voteReport(${report.id}, 'down')">👎 Dispute</button>
+            <div style="margin-top: 12px;">
+              <button class="btn-small btn-primary" onclick="window.upvoteReport(${report.id})">👍 Confirm</button>
             </div>
           ` : ''}
         </div>
@@ -171,21 +183,20 @@ function MapView({ user, userLocation, onReportClick }) {
         .addTo(map.current);
     });
 
-    window.voteReport = async (reportId, voteType) => {
+    window.upvoteReport = async (reportId) => {
       try {
-        const response = await fetch(`/api/reports/${reportId}/vote`, {
+        const response = await fetch(`/api/reports/${reportId}/upvote`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ vote_type: voteType })
+          }
         });
         if (response.ok) {
           fetchReports();
         }
       } catch (err) {
-        console.error('Error voting:', err);
+        console.error('Error upvoting:', err);
       }
     };
   };

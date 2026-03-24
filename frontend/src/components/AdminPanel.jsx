@@ -44,9 +44,9 @@ function AdminPanel() {
     }
   };
 
-  const getConfidenceLevel = (score) => {
-    if (score >= 5) return 'high';
-    if (score >= 2) return 'medium';
+  const getConfidenceLevel = (upvotes) => {
+    if (upvotes >= 3) return 'high';
+    if (upvotes >= 1) return 'medium';
     return 'low';
   };
 
@@ -67,19 +67,20 @@ function AdminPanel() {
             <div key={report.id} className="report-item">
               <div className="report-info">
                 <h4>
-                  <span className={`hazard-badge hazard-${report.hazard_type.replace('/', '\\/')}`}>
+                  <span className={`hazard-badge hazard-${report.hazard_type}`}>
                     {report.hazard_type}
                   </span>
                   {' '}
-                  <span className={`confidence-${getConfidenceLevel(report.trust_score)}`}>
-                    {getConfidenceLevel(report.trust_score)} confidence
+                  <span className={`confidence-${getConfidenceLevel(report.upvotes)}`}>
+                    {getConfidenceLevel(report.upvotes)} confidence
                   </span>
                 </h4>
                 <p>{report.description || 'No description'}</p>
                 <div className="report-meta">
                   <span>Trail: {report.trail_name || 'Unknown'}</span>
                   <span>Reporter: {report.reporter_email}</span>
-                  <span>👍 {report.upvotes} 👎 {report.downvotes}</span>
+                  <span>👍 {report.upvotes} confirms</span>
+                  <span>Status: {report.status}</span>
                   <span style={{ color: isExpired(report.expires_at) ? '#dc3545' : '#28a745' }}>
                     {isExpired(report.expires_at) ? 'EXPIRED' : `Expires: ${new Date(report.expires_at).toLocaleDateString()}`}
                   </span>

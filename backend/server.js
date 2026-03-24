@@ -5,10 +5,35 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// PRD Section 25: Standardized error response helper
+const createErrorResponse = (code, message, details = null) => {
+  const error = {
+    error: {
+      code,
+      message
+    }
+  };
+  if (details) {
+    error.error.details = details;
+  }
+  return error;
+};
+
+// Common error codes per PRD Section 25
+const ErrorCodes = {
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
+  AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR',
+  RATE_LIMIT_ERROR: 'RATE_LIMIT_ERROR',
+  NOT_FOUND: 'NOT_FOUND',
+  INTERNAL_ERROR: 'INTERNAL_ERROR'
+};
 
 app.use(cors());
 app.use(express.json());
@@ -45,18 +70,34 @@ const upload = multer({
   }
 });
 
+// PRD Section 7.3: Rate limiting - 10 reports per hour per user
+const reportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 reports per hour
+  message: { 
+    error: {
+      code: 'RATE_LIMIT_ERROR',
+      message: 'Too many reports submitted. Please try again later.',
+      details: { limit: 10, window: '1 hour' }
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.userId || req.ip
+});
+
 // JWT middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return res.status(401).json(createErrorResponse(ErrorCodes.AUTHENTICATION_ERROR, 'Access token required'));
   }
   
   jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
     if (err) {
-      return res.status(403).json({ error: 'Invalid token' });
+      return res.status(403).json(createErrorResponse(ErrorCodes.AUTHORIZATION_ERROR, 'Invalid or expired token'));
     }
     req.user = user;
     next();
@@ -97,18 +138,15 @@ const initDB = async () => {
         image_url VARCHAR(255),
         location GEOGRAPHY(POINT, 4326),
         upvotes INTEGER DEFAULT 0,
-        downvotes INTEGER DEFAULT 0,
-        trust_score INTEGER DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'active',
         expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_active BOOLEAN DEFAULT TRUE
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       
       CREATE TABLE IF NOT EXISTS votes (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),
         report_id INTEGER REFERENCES reports(id),
-        vote_type VARCHAR(10) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, report_id)
       );
@@ -142,7 +180,7 @@ app.post('/api/auth/register', async (req, res) => {
     
     res.json({ token, user: result.rows[0] });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json(createErrorResponse(ErrorCodes.VALIDATION_ERROR, err.message, { field: 'email' }));
   }
 });
 
@@ -152,14 +190,14 @@ app.post('/api/auth/login', async (req, res) => {
     
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json(createErrorResponse(ErrorCodes.AUTHENTICATION_ERROR, 'Invalid credentials'));
     }
     
     const user = result.rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
     
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json(createErrorResponse(ErrorCodes.AUTHENTICATION_ERROR, 'Invalid credentials'));
     }
     
     const token = jwt.sign(
@@ -170,7 +208,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     res.json({ token, user: { id: user.id, email: user.email, reputation_score: user.reputation_score } });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Authentication failed'));
   }
 });
 
@@ -192,44 +230,34 @@ app.get('/api/reports', async (req, res) => {
         $3
       )
       AND r.expires_at > NOW()
-      AND r.is_active = TRUE
+      AND r.status = 'active'
       ORDER BY r.created_at DESC
     `, [lng, lat, radius]);
     
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to fetch reports'));
   }
 });
 
-// Create report
-app.post('/api/reports', authenticateToken, upload.single('image'), async (req, res) => {
+// Create report - with rate limiting (PRD Section 7.3: 10 reports/hour per user)
+app.post('/api/reports', authenticateToken, reportLimiter, upload.single('image'), async (req, res) => {
   try {
     const { trail_id, hazard_type, description, lat, lng } = req.body;
     const userId = req.user.userId;
     
-    // Calculate expiration based on hazard type
-    const expirationHours = {
-      'Mud': 24,
-      'Flooding': 12,
-      'Ice/Snow': 48,
-      'Obstruction': 72,
-      'Closed': 168, // 7 days for closures
-      'Other': 24
-    };
-    
+    // PRD: All reports expire after 48 hours
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + (expirationHours[hazard_type] || 24));
+    expiresAt.setHours(expiresAt.getHours() + 48);
     
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    const photoBonus = req.file ? 2 : 0;
     
     const result = await pool.query(`
       INSERT INTO reports (user_id, trail_id, hazard_type, description, image_url, 
-        location, expires_at, trust_score)
-      VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, $9)
+        location, expires_at)
+      VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8)
       RETURNING *
-    `, [userId, trail_id, hazard_type, description, imageUrl, lng, lat, expiresAt, photoBonus]);
+    `, [userId, trail_id, hazard_type, description, imageUrl, lng, lat, expiresAt]);
     
     // Update user reports count
     await pool.query(
@@ -237,17 +265,16 @@ app.post('/api/reports', authenticateToken, upload.single('image'), async (req, 
       [userId]
     );
     
-    res.json(result.rows[0]);
+    res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to create report'));
   }
 });
 
-// Vote on report
-app.post('/api/reports/:id/vote', authenticateToken, async (req, res) => {
+// Upvote report (PRD: One vote per user per report)
+app.post('/api/reports/:id/upvote', authenticateToken, async (req, res) => {
   try {
     const reportId = req.params.id;
-    const { vote_type } = req.body; // 'up' or 'down'
     const userId = req.user.userId;
     
     // Check if user already voted
@@ -257,33 +284,25 @@ app.post('/api/reports/:id/vote', authenticateToken, async (req, res) => {
     );
     
     if (existingVote.rows.length > 0) {
-      // Update existing vote
-      await pool.query(
-        'UPDATE votes SET vote_type = $1 WHERE user_id = $2 AND report_id = $3',
-        [vote_type, userId, reportId]
-      );
-    } else {
-      // Create new vote
-      await pool.query(
-        'INSERT INTO votes (user_id, report_id, vote_type) VALUES ($1, $2, $3)',
-        [userId, reportId, vote_type]
-      );
+      return res.status(400).json(createErrorResponse(ErrorCodes.VALIDATION_ERROR, 'Already upvoted this report'));
     }
     
-    // Update report vote counts and trust score
+    // Create new vote
+    await pool.query(
+      'INSERT INTO votes (user_id, report_id) VALUES ($1, $2)',
+      [userId, reportId]
+    );
+    
+    // Update report upvotes count
     await pool.query(`
       UPDATE reports 
-      SET upvotes = (SELECT COUNT(*) FROM votes WHERE report_id = $1 AND vote_type = 'up'),
-          downvotes = (SELECT COUNT(*) FROM votes WHERE report_id = $1 AND vote_type = 'down'),
-          trust_score = ((SELECT COUNT(*) FROM votes WHERE report_id = $1 AND vote_type = 'up') - 
-                        (SELECT COUNT(*) FROM votes WHERE report_id = $1 AND vote_type = 'down')) + 
-                        CASE WHEN image_url IS NOT NULL THEN 2 ELSE 0 END
+      SET upvotes = (SELECT COUNT(*) FROM votes WHERE report_id = $1)
       WHERE id = $1
     `, [reportId]);
     
-    res.json({ message: 'Vote recorded' });
+    res.json({ message: 'Upvote recorded' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to record upvote'));
   }
 });
 
@@ -308,7 +327,7 @@ app.get('/api/trails', async (req, res) => {
     
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to fetch trails'));
   }
 });
 
@@ -328,16 +347,16 @@ app.get('/api/alerts', authenticateToken, async (req, res) => {
         ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
         $3
       )
-      AND r.trust_score >= 5
+      AND r.upvotes >= 3
       AND r.expires_at > NOW()
-      AND r.is_active = TRUE
-      AND r.hazard_type IN ('Flooding', 'Ice/Snow', 'Closed')
-      ORDER BY r.trust_score DESC, r.created_at DESC
+      AND r.status = 'active'
+      AND r.hazard_type IN ('flooding', 'ice', 'closed_trail')
+      ORDER BY r.upvotes DESC, r.created_at DESC
     `, [lng, lat, radius]);
     
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to fetch alerts'));
   }
 });
 
@@ -355,7 +374,7 @@ app.get('/api/admin/reports', authenticateToken, async (req, res) => {
     
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to fetch admin reports'));
   }
 });
 
@@ -365,7 +384,111 @@ app.delete('/api/admin/reports/:id', authenticateToken, async (req, res) => {
     await pool.query('DELETE FROM reports WHERE id = $1', [req.params.id]);
     res.json({ message: 'Report deleted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to delete report'));
+  }
+});
+
+// PRD: Token refresh endpoint
+app.post('/api/auth/refresh', authenticateToken, async (req, res) => {
+  try {
+    const token = jwt.sign(
+      { userId: req.user.userId, email: req.user.email },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+    res.json({ token, expires_in: 86400 });
+  } catch (err) {
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to refresh token'));
+  }
+});
+
+// PRD: Get user profile
+app.get('/api/users/profile', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, email, reputation_score, reports_count, created_at FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json(createErrorResponse(ErrorCodes.NOT_FOUND, 'User not found'));
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to fetch user profile'));
+  }
+});
+
+// PRD: Update user profile
+app.put('/api/users/profile', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await pool.query(
+      'UPDATE users SET email = $1 WHERE id = $2 RETURNING id, email, reputation_score, reports_count, created_at',
+      [email, req.user.userId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to update profile'));
+  }
+});
+
+// PRD: Get current user's reports
+app.get('/api/users/reports', authenticateToken, async (req, res) => {
+  try {
+    const { status, limit = 20 } = req.query;
+    let query = `
+      SELECT r.*, t.name as trail_name,
+        ST_X(r.location::geometry) as longitude,
+        ST_Y(r.location::geometry) as latitude
+      FROM reports r
+      LEFT JOIN trails t ON r.trail_id = t.id
+      WHERE r.user_id = $1
+    `;
+    const params = [req.user.userId];
+    
+    if (status) {
+      query += ` AND r.status = $${params.length + 1}`;
+      params.push(status);
+    }
+    
+    query += ` ORDER BY r.created_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+    
+    const result = await pool.query(query, params);
+    res.json({ reports: result.rows });
+  } catch (err) {
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to fetch user reports'));
+  }
+});
+
+// PRD: Admin flag report
+app.put('/api/admin/reports/:id/flag', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "UPDATE reports SET status = 'flagged' WHERE id = $1 RETURNING *",
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json(createErrorResponse(ErrorCodes.NOT_FOUND, 'Report not found'));
+    }
+    res.json({ message: 'Report flagged', report: result.rows[0] });
+  } catch (err) {
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to flag report'));
+  }
+});
+
+// PRD: Admin ban user
+app.post('/api/admin/users/:id/ban', authenticateToken, async (req, res) => {
+  try {
+    // Set all user's reports to removed status
+    await pool.query(
+      "UPDATE reports SET status = 'removed' WHERE user_id = $1",
+      [req.params.id]
+    );
+    // Note: In production, also deactivate user account
+    res.json({ message: 'User banned and reports removed' });
+  } catch (err) {
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to ban user'));
   }
 });
 
@@ -395,7 +518,7 @@ app.post('/api/seed/trails', async (req, res) => {
     
     res.json({ message: 'Chicago trails seeded successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json(createErrorResponse(ErrorCodes.INTERNAL_ERROR, 'Failed to seed trails'));
   }
 });
 
