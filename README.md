@@ -52,28 +52,46 @@ curl -X POST http://localhost:3001/api/seed/trails
 
 - **Interactive Map** - Real-time trail and hazard visualization
 - **≤10 Second Reporting** - Quick hazard submission with photo capture
-- **Trust System** - Voting-based confidence scoring
-- **Auto-Expiration** - Time-aware data freshness
+- **Trust System** - Upvote-based confidence scoring
+- **Auto-Expiration** - 48-hour data freshness (PRD compliant)
 - **Safety Alerts** - High-confidence hazard notifications
 - **Photo Validation** - Image-based credibility boost
+- **PWA Support** - Offline functionality with service worker
+- **Rate Limiting** - 10 reports/hour per user (anti-spam)
 
 ## Tech Stack
 
 - **Frontend:** React 18 + Vite + Mapbox GL
 - **Backend:** Node.js + Express
 - **Database:** PostgreSQL + PostGIS
-- **Auth:** JWT
+- **Auth:** JWT with refresh tokens
 - **Storage:** Local filesystem (MVP), AWS S3 ready
+- **Rate Limiting:** express-rate-limit
 
 ## API Endpoints
 
+### Authentication
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
+- `POST /api/auth/refresh` - Refresh JWT token
+
+### Trails & Reports
 - `GET /api/trails` - Get nearby trails
 - `GET /api/reports` - Get nearby reports
-- `POST /api/reports` - Create report
-- `POST /api/reports/:id/vote` - Vote on report
+- `POST /api/reports` - Create report (rate limited: 10/hour)
+- `POST /api/reports/:id/upvote` - Upvote report
 - `GET /api/alerts` - Get safety alerts
+
+### User
+- `GET /api/users/profile` - Get user profile
+- `PUT /api/users/profile` - Update user profile
+- `GET /api/users/reports` - Get current user's reports
+
+### Admin
+- `GET /api/admin/reports` - Get all reports
+- `DELETE /api/admin/reports/:id` - Delete report
+- `PUT /api/admin/reports/:id/flag` - Flag report
+- `POST /api/admin/users/:id/ban` - Ban user
 
 ## License
 
