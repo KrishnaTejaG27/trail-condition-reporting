@@ -5,6 +5,7 @@ import { getReport } from '@/controllers/reportController';
 import { updateReport } from '@/controllers/reportController';
 import { deleteReport } from '@/controllers/reportController';
 import { protect } from '@/middleware/auth';
+import { validateCreateReport } from '@/middleware/validation';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.get('/:id', getReport);
 
 // Protected routes
 router.use(protect);
-router.post('/', createReport);
+router.post('/', validateCreateReport, createReport);
 router.put('/:id', updateReport);
 router.delete('/:id', deleteReport);
 

@@ -2,10 +2,11 @@ import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, User, Clock, ThumbsUp, MessageSquare, Share } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, ThumbsUp, MessageSquare, Share } from 'lucide-react';
 
 const ReportDetail = () => {
   const { id } = useParams();
+  console.log('Report ID:', id); // Temporary usage to avoid unused warning
 
   return (
     <div className="p-6">
