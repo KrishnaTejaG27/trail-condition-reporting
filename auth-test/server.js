@@ -91,6 +91,48 @@ const server = http.createServer((req, res) => {
       }
     });
   }
+  // Get current user endpoint
+  else if (url === '/api/auth/me' && method === 'GET') {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: 'No token provided'
+      }));
+      return;
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    // In a real app, we would validate the JWT token
+    // For mock, we'll just return the test user
+    const user = users[0]; // Return first user for demo
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      data: { user }
+    }));
+  }
+  // Logout endpoint
+  else if (url === '/api/auth/logout' && method === 'POST') {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: 'No token provided'
+      }));
+      return;
+    }
+
+    // In a real app, we would invalidate the token
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      message: 'Logout successful'
+    }));
+  }
   // Login endpoint
   else if (url === '/api/auth/login' && method === 'POST') {
     let body = '';

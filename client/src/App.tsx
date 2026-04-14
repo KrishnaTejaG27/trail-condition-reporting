@@ -11,6 +11,7 @@ import Dashboard from '@/pages/Dashboard';
 import ReportDetail from '@/pages/ReportDetail';
 import CreateReport from '@/pages/CreateReport';
 import Profile from '@/pages/Profile';
+import AdminPanel from '@/pages/AdminPanel';
 
 // Components
 import Layout from '@/components/Layout';
@@ -49,6 +50,7 @@ function App() {
               <Route path="reports/:id" element={<ReportDetail />} />
               <Route path="reports/new" element={<CreateReport />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="admin" element={<AdminPanel />} />
             </Route>
           </Routes>
           <Toaster />

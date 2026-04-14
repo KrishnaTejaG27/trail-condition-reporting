@@ -1,4 +1,6 @@
-const API_BASE_URL = (import.meta.env as any).VITE_API_URL || 'http://localhost:3002/api';
+// Use relative URL to go through Vite dev server proxy (avoids CORS)
+const API_BASE_URL = '/api';
+const REPORTS_API_URL = API_BASE_URL;
 
 export const api = {
   // Auth endpoints
@@ -38,24 +40,24 @@ export const api = {
   reports: {
     getAll: (params?: any) => {
       const queryString = params ? `?${new URLSearchParams(params)}` : '';
-      return fetch(`${API_BASE_URL}/reports${queryString}`);
+      return fetch(`${REPORTS_API_URL}/reports${queryString}`);
     },
     
     getById: (id: string) =>
-      fetch(`${API_BASE_URL}/reports/${id}`),
+      fetch(`${REPORTS_API_URL}/reports/${id}`),
     
-    create: (reportData: any, token: string) =>
-      fetch(`${API_BASE_URL}/reports`, {
+    create: (reportData: any, token: string | null | undefined) =>
+      fetch(`${REPORTS_API_URL}/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify(reportData),
       }),
     
     update: (id: string, reportData: any, token: string) =>
-      fetch(`${API_BASE_URL}/reports/${id}`, {
+      fetch(`${REPORTS_API_URL}/reports/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +67,7 @@ export const api = {
       }),
     
     delete: (id: string, token: string) =>
-      fetch(`${API_BASE_URL}/reports/${id}`, {
+      fetch(`${REPORTS_API_URL}/reports/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

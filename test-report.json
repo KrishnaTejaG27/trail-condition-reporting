@@ -1,0 +1,10 @@
+{
+  "conditionType": "FALLEN_TREE",
+  "severityLevel": "HIGH",
+  "description": "Test fallen tree blocking trail",
+  "location": {
+    "type": "Point",
+    "coordinates": [-122.4194, 37.7749]
+  },
+  "trailId": "trail_1"
+}
