@@ -34,6 +34,8 @@ model User {
   userAlerts        UserAlert[]
   resolvedReports   Report[]  @relation("ResolvedBy")
   createdAlerts     Alert[]
+  auditLogs         AuditLog[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -98,12 +100,13 @@ model Report {
   status           ReportStatus  @default(ACTIVE) @map("status")
 
   // Relations
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trail    Trail?   @relation(fields: [trailId], references: [id], onDelete: SetNull)
-  photos   Photo[]
-  comments Comment[]
-  votes    Vote[]
-  alerts   Alert[]
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trail      Trail?   @relation(fields: [trailId], references: [id], onDelete: SetNull)
+  photos     Photo[]
+  comments   Comment[]
+  votes      Vote[]
+  alerts     Alert[]
+  resolver   User?    @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
 
   @@map("reports")
 }
@@ -203,6 +206,23 @@ model UserAlert {
 
   @@unique([userId, alertId])
   @@map("user_alerts")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscriptions")
 }
 
 model AuditLog {

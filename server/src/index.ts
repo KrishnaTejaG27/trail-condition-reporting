@@ -5,9 +5,12 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import rateLimit from 'express-rate-limit';
 
-import authRoutes from '@/routes/auth';
+// Using mock auth routes for testing without database
+import authRoutes from '@/routes/mockAuth';
 import userRoutes from '@/routes/users';
 import reportRoutes from '@/routes/reports';
+import notificationRoutes from '@/routes/notifications';
+import analyticsRoutes from '@/routes/analytics';
 import { errorHandler } from '@/middleware/errorHandler';
 import { notFound } from '@/middleware/notFound';
 
@@ -39,6 +42,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -49,6 +53,8 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Error handling middleware
 app.use(notFound);

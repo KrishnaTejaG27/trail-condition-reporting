@@ -364,3 +364,61 @@ export const deleteReport = async (req: AuthRequest, res: Response) => {
     });
   }
 };
+
+// Upload photo for report
+export const uploadPhoto = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded',
+      });
+    }
+
+    // Check if report exists
+    const report = await prisma.report.findUnique({
+      where: { id },
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report not found',
+      });
+    }
+
+    // Only allow user to add photos to their own reports
+    if (report.userId !== req.user!.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to add photos to this report',
+      });
+    }
+
+    // Create photo record
+    const photo = await prisma.photo.create({
+      data: {
+        reportId: id,
+        userId: req.user!.id,
+        url: `/uploads/${req.file.filename}`,
+        thumbnailUrl: `/uploads/${req.file.filename}`,
+        fileSizeBytes: req.file.size,
+        mimeType: req.file.mimetype,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { photo },
+      message: 'Photo uploaded successfully',
+    });
+  } catch (error) {
+    console.error('Upload photo error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upload photo',
+    });
+  }
+};

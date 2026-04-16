@@ -1,13 +1,65 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, MapPin, TreePine, Waves, Mountain } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
+import { api } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 const CreateReport = () => {
   const [step, setStep] = useState(1);
   const [selectedCondition, setSelectedCondition] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState('');
+  const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { token } = useAuthStore();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleSubmit = async () => {
+    if (!selectedCondition || !selectedSeverity) {
+      toast({
+        title: "Missing Information",
+        description: "Please select condition type and severity level",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const reportData = {
+        conditionType: selectedCondition.toUpperCase(),
+        severityLevel: selectedSeverity.toUpperCase(),
+        description: description || `${selectedCondition} hazard reported`,
+        location: {
+          type: "Point",
+          coordinates: [-122.4194, 37.7749] // Default location (San Francisco)
+        },
+        trailId: "trail_1"
+      };
+
+      await api.reports.create(reportData, token || undefined);
+      
+      toast({
+        title: "Report Submitted!",
+        description: "Your hazard report has been successfully submitted.",
+      });
+      
+      navigate('/app');
+    } catch (error) {
+      toast({
+        title: "Submission Failed",
+        description: error instanceof Error ? error.message : "Failed to submit report",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const conditions = [
     { id: 'fallen_tree', label: 'Fallen Tree', icon: TreePine, color: 'bg-amber-600' },
@@ -198,6 +250,8 @@ const CreateReport = () => {
               <div>
                 <label className="block text-sm font-medium mb-2">Description (optional)</label>
                 <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   rows={4}
                   placeholder="Tell others more about this hazard..."
@@ -222,7 +276,9 @@ const CreateReport = () => {
 
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setStep(3)}>Back</Button>
-                <Button>Submit Report</Button>
+                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting...' : 'Submit Report'}
+                </Button>
               </div>
             </div>
           </CardContent>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .success { color: green; font-size: 18px; }
+        .error { color: red; font-size: 18px; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Trail Safety Platform - Connection Test</h1>
+    
+    <div id="status">Testing connection...</div>
+    
+    <button onclick="testConnection()">Test Backend Connection</button>
+    <button onclick="window.location.href='http://localhost:5173'">Open Frontend</button>
+    
+    <script>
+        async function testConnection() {
+            try {
+                const response = await fetch('http://localhost:3001/health');
+                const data = await response.json();
+                document.getElementById('status').innerHTML = 
+                    `<div class="success">✅ Backend Connected: ${data.status}</div>
+                     <div>✅ Frontend should be at: <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></div>`;
+            } catch (error) {
+                document.getElementById('status').innerHTML = 
+                    `<div class="error">❌ Connection Failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-test on load
+        testConnection();
+    </script>
+</body>
+</html>

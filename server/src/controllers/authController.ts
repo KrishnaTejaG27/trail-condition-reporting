@@ -16,6 +16,8 @@ export const register = async (req: Request, res: Response) => {
   try {
     const { email, username, password, firstName, lastName } = req.body;
 
+    console.log('Registration attempt:', { email, username, firstName, lastName });
+
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -27,6 +29,7 @@ export const register = async (req: Request, res: Response) => {
     });
 
     if (existingUser) {
+      console.log('User already exists:', existingUser.email === email ? 'Email' : 'Username');
       return res.status(400).json({
         success: false,
         error: existingUser.email === email 
@@ -38,6 +41,7 @@ export const register = async (req: Request, res: Response) => {
     // Hash password
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
+    console.log('Password hashed successfully');
 
     // Create user
     const user = await prisma.user.create({
@@ -59,8 +63,11 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
+    console.log('User created successfully:', user.email);
+
     // Generate token
     const token = generateToken(user.id);
+    console.log('Token generated successfully');
 
     res.status(201).json({
       success: true,
@@ -70,11 +77,12 @@ export const register = async (req: Request, res: Response) => {
       },
       message: 'User registered successfully',
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error);
     res.status(500).json({
       success: false,
       error: 'Registration failed',
+      details: error.message,
     });
   }
 };
@@ -142,6 +150,24 @@ export const login = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Login failed',
+    });
+  }
+};
+
+// Logout user
+export const logout = async (req: AuthRequest, res: Response) => {
+  try {
+    // In a stateless JWT setup, logout is handled client-side by removing the token
+    // However, we can add token blacklisting if needed in the future
+    res.json({
+      success: true,
+      message: 'Logout successful',
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Logout failed',
     });
   }
 };
