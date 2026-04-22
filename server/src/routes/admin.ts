@@ -303,7 +303,7 @@ router.put('/reports/:id/flag', async (req, res) => {
 router.put('/reports/:id/resolve', async (req, res) => {
   try {
     const { id } = req.params;
-    const adminId = req.user!.id;
+    const adminId = (req as any).user!.id;
     
     // Try database first
     try {

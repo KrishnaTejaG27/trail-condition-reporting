@@ -10,7 +10,7 @@ const router = Router();
  */
 router.get('/me/stats', protect, async (req, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = (req as any).user!.id;
     
     // Try database first
     try {
