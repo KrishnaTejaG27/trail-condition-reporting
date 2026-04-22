@@ -7,20 +7,19 @@ import { getReport } from '@/controllers/reportController';
 import { updateReport } from '@/controllers/reportController';
 import { deleteReport } from '@/controllers/reportController';
 import { uploadPhoto } from '@/controllers/reportController';
+import { upvoteReport } from '@/controllers/reportController';
+import { removeUpvote } from '@/controllers/reportController';
+import { getReportComments } from '@/controllers/reportController';
+import { addReportComment } from '@/controllers/reportController';
+import { updateComment } from '@/controllers/reportController';
+import { deleteComment } from '@/controllers/reportController';
 import { protect } from '@/middleware/auth';
 import { validateCreateReport } from '@/middleware/validation';
 
 const router = Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
+// Configure multer for memory storage (S3 uploads)
+const storage = multer.memoryStorage();
 
 const upload = multer({ 
   storage,
@@ -48,5 +47,11 @@ router.post('/', validateCreateReport, createReport);
 router.put('/:id', updateReport);
 router.delete('/:id', deleteReport);
 router.post('/:id/photos', upload.single('photo'), uploadPhoto);
+router.post('/:id/upvote', upvoteReport);
+router.delete('/:id/upvote', removeUpvote);
+router.get('/:id/comments', getReportComments);
+router.post('/:id/comments', addReportComment);
+router.put('/:id/comments/:commentId', updateComment);
+router.delete('/:id/comments/:commentId', deleteComment);
 
 export default router;

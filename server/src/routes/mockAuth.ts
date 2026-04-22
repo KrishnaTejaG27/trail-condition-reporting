@@ -92,16 +92,34 @@ router.post('/login', async (req, res) => {
 
     // For test users with plain text passwords (simplified for demo)
     let isMatch = false;
+    console.log('Checking password:', { 
+      userPassword: user.password, 
+      inputPassword: password,
+      passwordMatch: user.password === password 
+    });
+    
     if (user.password === password) {
       isMatch = true;
+      console.log('Plain text password matched');
     } else if (await bcrypt.compare(password, user.passwordHash || '')) {
       isMatch = true;
+      console.log('Hashed password matched');
+    } else {
+      console.log('No password match found');
     }
 
     if (!isMatch) {
       return res.status(401).json({
         success: false,
         error: 'Invalid credentials',
+      });
+    }
+
+    // Check if user is banned
+    if (user.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        error: 'Your account has been banned. Please contact support.',
       });
     }
 
@@ -119,6 +137,7 @@ router.post('/login', async (req, res) => {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
+          isActive: user.isActive,
         },
         token,
       },

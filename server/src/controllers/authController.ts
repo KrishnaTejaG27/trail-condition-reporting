@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/index';
 import { AuthRequest } from '@/middleware/auth';
+import { mockUsers } from '@/mockDb';
 
 // Generate JWT token
 const generateToken = (id: string) => {
@@ -92,59 +93,118 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        passwordHash: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        lastLogin: true,
-      },
-    });
+    // Try database first, fall back to mock
+    try {
+      // Find user
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          passwordHash: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          isActive: true,
+          lastLogin: true,
+        },
+      });
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials',
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid credentials',
+        });
+      }
+
+      // Check if user is banned
+      if (!user.isActive) {
+        return res.status(403).json({
+          success: false,
+          error: 'Your account has been banned. Please contact support.',
+        });
+      }
+
+      // Check password
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid credentials',
+        });
+      }
+
+      // Update last login
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      });
+
+      // Generate token
+      const token = generateToken(user.id);
+
+      // Remove password from response
+      const { passwordHash, ...userWithoutPassword } = user;
+
+      res.json({
+        success: true,
+        data: {
+          user: userWithoutPassword,
+          token,
+        },
+      });
+    } catch (dbError) {
+      // Mock mode fallback
+      console.log('Using mock mode for login');
+      
+      const mockUser = mockUsers.find((u: any) => u.email === email);
+      
+      if (!mockUser) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid credentials',
+        });
+      }
+
+      // Check if user is banned
+      if (mockUser.isActive === false) {
+        return res.status(403).json({
+          success: false,
+          error: 'Your account has been banned. Please contact support.',
+        });
+      }
+
+      // Check password (plain text for mock)
+      if (mockUser.password !== password) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid credentials',
+        });
+      }
+
+      // Generate token
+      const token = generateToken(mockUser.id);
+
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: mockUser.id,
+            email: mockUser.email,
+            username: mockUser.username,
+            firstName: mockUser.firstName,
+            lastName: mockUser.lastName,
+            role: mockUser.role,
+            isActive: mockUser.isActive,
+            lastLogin: mockUser.lastLogin,
+          },
+          token,
+        },
+        message: 'Login successful (mock)',
       });
     }
-
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials',
-      });
-    }
-
-    // Update last login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
-
-    // Generate token
-    const token = generateToken(user.id);
-
-    // Remove password from response
-    const { passwordHash, ...userWithoutPassword } = user;
-
-    res.json({
-      success: true,
-      data: {
-        user: userWithoutPassword,
-        token,
-      },
-      message: 'Login successful',
-    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({

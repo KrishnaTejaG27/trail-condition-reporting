@@ -41,6 +41,7 @@ export interface Report {
   severityLevel: string;
   description: string;
   isResolved?: boolean;
+  isActive?: boolean;
   location: {
     type: string;
     coordinates: [number, number];
@@ -49,6 +50,17 @@ export interface Report {
   user?: {
     firstName: string;
     username: string;
+    id?: string;
+  };
+  photos?: {
+    id: string;
+    url: string;
+    thumbnailUrl: string;
+    caption?: string;
+  }[];
+  _count?: {
+    votes: number;
+    comments: number;
   };
 }
 

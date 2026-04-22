@@ -8,10 +8,14 @@ import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
-import ReportDetail from '@/pages/ReportDetail';
-import CreateReport from '@/pages/CreateReport';
-import Profile from '@/pages/Profile';
-import AdminPanel from '@/pages/AdminPanel';
+import ReportDetail from './pages/ReportDetail'
+import CreateReport from './pages/CreateReport'
+import Reports from './pages/Reports'
+import Profile from './pages/Profile'
+import AdminPanel from './pages/AdminPanel';
+import AdminDashboard from './pages/AdminDashboard';
+import UserProfile from './pages/UserProfile';
+import Trails from './pages/Trails';
 
 // Components
 import Layout from '@/components/Layout';
@@ -47,10 +51,14 @@ function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Dashboard />} />
+              <Route path="reports" element={<Reports />} />
               <Route path="reports/:id" element={<ReportDetail />} />
-              <Route path="reports/new" element={<CreateReport />} />
+              <Route path="reports/create" element={<CreateReport />} />
+              <Route path="trails" element={<Trails />} />
               <Route path="profile" element={<Profile />} />
-              <Route path="admin" element={<AdminPanel />} />
+              <Route path="admin" element={<AdminDashboard />} />
+              <Route path="admin/panel" element={<AdminPanel />} />
+              <Route path="users/:id" element={<UserProfile />} />
             </Route>
           </Routes>
           <Toaster />

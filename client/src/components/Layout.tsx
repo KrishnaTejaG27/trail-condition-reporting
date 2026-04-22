@@ -8,7 +8,9 @@ import {
   User, 
   LogOut,
   Menu,
-  X
+  X,
+  Shield,
+  Route
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -19,9 +21,13 @@ const Layout = () => {
 
   const navigation = [
     { name: 'Map', href: '/app', icon: Map },
+    { name: 'Trails', href: '/app/trails', icon: Route },
     { name: 'Reports', href: '/app/reports', icon: FileText },
-    { name: 'Create Report', href: '/app/reports/new', icon: Plus },
+    { name: 'Create Report', href: '/app/reports/create', icon: Plus },
     { name: 'Profile', href: '/app/profile', icon: User },
+    ...(user?.role === 'ADMIN' || user?.role === 'MODERATOR' 
+      ? [{ name: 'Admin', href: '/app/admin', icon: Shield }]
+      : []),
   ];
 
   const isActive = (path: string) => {

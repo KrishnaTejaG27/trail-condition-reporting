@@ -9,10 +9,16 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from '@/routes/mockAuth';
 import userRoutes from '@/routes/users';
 import reportRoutes from '@/routes/reports';
+import trailRoutes from '@/routes/trails';
 import notificationRoutes from '@/routes/notifications';
 import analyticsRoutes from '@/routes/analytics';
+import adminRoutes from '@/routes/admin';
+import userStatsRoutes from '@/routes/userStats';
+import trailImportRoutes from '@/routes/trailImport';
+import pushRoutes from '@/routes/push';
 import { errorHandler } from '@/middleware/errorHandler';
 import { notFound } from '@/middleware/notFound';
+import { seedTrails } from '@/controllers/trailController';
 
 // Load environment variables
 dotenv.config();
@@ -26,10 +32,10 @@ export const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],
 });
 
-// Rate limiting
+// Rate limiting - increased for development
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'), // 1000 requests per windowMs for dev
   message: 'Too many requests from this IP, please try again later.',
 });
 
@@ -53,8 +59,16 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/trails', trailRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/users', userStatsRoutes);
+app.use('/api/trails/import', trailImportRoutes);
+app.use('/api/push', pushRoutes);
+
+// Seed sample trails on startup
+seedTrails();
 
 // Error handling middleware
 app.use(notFound);

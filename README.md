@@ -48,6 +48,27 @@ App runs on http://localhost:3000
 curl -X POST http://localhost:3001/api/seed/trails
 ```
 
+---
+
+## 🚀 AWS Deployment (Free Tier)
+
+See [AWS-DEPLOYMENT.md](AWS-DEPLOYMENT.md) for complete instructions.
+
+### Quick Deploy:
+1. Create EC2 instance (t2.micro - free tier)
+2. Create S3 bucket: `trailwatch-photos-group8`
+3. Create IAM user with S3 access
+4. SSH to EC2 and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/trail-condition-reporting-1/main/deploy.sh | bash
+```
+
+5. Configure your `.env` file with AWS credentials
+6. Deploy backend & frontend
+
+**Cost**: $0/month (within AWS Free Tier limits)
+
 ## Features
 
 - **Interactive Map** - Real-time trail and hazard visualization

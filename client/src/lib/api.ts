@@ -73,6 +73,56 @@ export const api = {
           'Authorization': `Bearer ${token}`,
         },
       }),
+    
+    upvote: (id: string, token: string) =>
+      fetch(`${REPORTS_API_URL}/reports/${id}/upvote`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    removeUpvote: (id: string, token: string) =>
+      fetch(`${REPORTS_API_URL}/reports/${id}/upvote`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    getComments: (id: string, token?: string) => {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return fetch(`${REPORTS_API_URL}/reports/${id}/comments`, { headers });
+    },
+    
+    addComment: (id: string, content: string, token: string) =>
+      fetch(`${REPORTS_API_URL}/reports/${id}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content }),
+      }),
+    
+    updateComment: (id: string, commentId: string, content: string, token: string) =>
+      fetch(`${REPORTS_API_URL}/reports/${id}/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content }),
+      }),
+    
+    deleteComment: (id: string, commentId: string, token: string) =>
+      fetch(`${REPORTS_API_URL}/reports/${id}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
   },
 
   // User endpoints
@@ -94,14 +144,202 @@ export const api = {
         body: JSON.stringify(profileData),
       }),
   },
+
+  // Upload photo for a report
+  uploadPhoto: (reportId: string, file: File, token: string) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    
+    return fetch(`${REPORTS_API_URL}/reports/${reportId}/photos`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  },
+
+  // Trails endpoints
+  trails: {
+    getAll: () =>
+      fetch(`${API_BASE_URL}/trails`),
+    
+    getById: (id: string) =>
+      fetch(`${API_BASE_URL}/trails/${id}`),
+    
+    getNearby: (lat: number, lng: number, radius?: number) =>
+      fetch(`${API_BASE_URL}/trails/nearby?lat=${lat}&lng=${lng}&radius=${radius || 10}`),
+  },
+
+  // Admin endpoints (Phase 2)
+  admin: {
+    getStats: (token: string) =>
+      fetch(`${API_BASE_URL}/admin/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    getUsers: (token: string) =>
+      fetch(`${API_BASE_URL}/admin/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    getAllReports: (token: string) =>
+      fetch(`${API_BASE_URL}/admin/reports`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    banUser: (userId: string, token: string) =>
+      fetch(`${API_BASE_URL}/admin/users/${userId}/ban`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    flagReport: (reportId: string, token: string) =>
+      fetch(`${API_BASE_URL}/admin/reports/${reportId}/flag`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    removeReport: (reportId: string, token: string) =>
+      fetch(`${API_BASE_URL}/admin/reports/${reportId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    resolveReport: (reportId: string, token: string) =>
+      fetch(`${API_BASE_URL}/admin/reports/${reportId}/resolve`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    getUserDetails: (userId: string, token: string) =>
+      fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    getUserReports: (userId: string, token: string) =>
+      fetch(`${API_BASE_URL}/admin/users/${userId}/reports`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+  },
+  
+  userStats: {
+    getStats: (token: string) =>
+      fetch(`${API_BASE_URL}/users/me/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+  },
+  
+  trailImport: {
+    importCSV: (trails: any[], token: string) =>
+      fetch(`${API_BASE_URL}/trails/import/csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ trails }),
+      }),
+    
+    getSample: (token: string) =>
+      fetch(`${API_BASE_URL}/trails/import/sample`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+    
+    getStatus: (token: string) =>
+      fetch(`${API_BASE_URL}/trails/import/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }),
+  },
+  
+  push: {
+    getVapidPublicKey: () =>
+      fetch(`${API_BASE_URL}/push/vapid-public-key`),
+    
+    subscribe: (subscription: any) => {
+      const token = localStorage.getItem('token');
+      console.log('Push subscribe - token:', token ? 'present' : 'missing');
+      if (!token) {
+        return Promise.reject(new Error('No authentication token'));
+      }
+      return fetch(`${API_BASE_URL}/push/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ subscription }),
+      });
+    },
+    
+    unsubscribe: (endpoint: string) => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return Promise.reject(new Error('No authentication token'));
+      }
+      return fetch(`${API_BASE_URL}/push/unsubscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ endpoint }),
+      });
+    },
+    
+    test: () => {
+      const token = localStorage.getItem('token');
+      console.log('Push test - token:', token ? 'present' : 'missing');
+      if (!token) {
+        return Promise.reject(new Error('No authentication token'));
+      }
+      return fetch(`${API_BASE_URL}/push/test`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+    },
+  },
 };
 
 // Helper function to handle API responses
 export const handleApiResponse = async (response: Response) => {
+  // Check if response is JSON
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    throw new Error(`Server returned non-JSON response: ${text.slice(0, 100)}`);
+  }
+  
   const data = await response.json();
   
   if (!response.ok) {
-    throw new Error(data.error || 'API request failed');
+    throw new Error(data.error || data.message || `API request failed (${response.status})`);
   }
   
   return data;

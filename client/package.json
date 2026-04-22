@@ -29,7 +29,7 @@
     "@tanstack/react-query-devtools": "^5.95.2",
     "axios": "^1.6.2",
     "class-variance-authority": "^0.7.0",
-    "clsx": "^2.0.0",
+    "clsx": "^2.1.1",
     "date-fns": "^2.30.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.294.0",
@@ -38,7 +38,8 @@
     "react-hook-form": "^7.48.2",
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.20.1",
-    "tailwind-merge": "^2.0.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.22.4",
     "zustand": "^4.4.7"
