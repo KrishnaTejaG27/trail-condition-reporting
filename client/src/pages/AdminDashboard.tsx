@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  BarChart, 
-  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -21,11 +19,8 @@ import {
 import { 
   Users, 
   FileText, 
-  MapPin, 
-  TrendingUp, 
   AlertTriangle,
   CheckCircle,
-  Clock,
   Loader2,
   Ban,
   Flag,
@@ -104,6 +99,7 @@ export default function AdminDashboard() {
   }, [token]);
 
   const fetchDashboardData = async () => {
+    if (!token) return;
     setLoading(true);
     try {
       // Fetch stats
@@ -183,7 +179,7 @@ export default function AdminDashboard() {
 
   const handleBanUser = async (userId: string) => {
     try {
-      const res = await api.admin?.banUser(userId, token);
+      const res = await api.admin?.banUser(userId, token!);
       if (res) {
         await handleApiResponse(res);
         toast({ title: "User banned successfully" });
@@ -199,7 +195,7 @@ export default function AdminDashboard() {
 
   const handleFlagReport = async (reportId: string) => {
     try {
-      const res = await api.admin?.flagReport(reportId, token);
+      const res = await api.admin?.flagReport(reportId, token!);
       if (res) {
         await handleApiResponse(res);
         toast({ title: "Report flagged for review" });
@@ -215,7 +211,7 @@ export default function AdminDashboard() {
 
   const handleRemoveReport = async (reportId: string) => {
     try {
-      const res = await api.admin?.removeReport(reportId, token);
+      const res = await api.admin?.removeReport(reportId, token!);
       if (res) {
         await handleApiResponse(res);
         toast({ title: "Report removed" });
@@ -228,7 +224,7 @@ export default function AdminDashboard() {
 
   const handleResolveReport = async (reportId: string) => {
     try {
-      const res = await api.admin?.resolveReport(reportId, token);
+      const res = await api.admin?.resolveReport(reportId, token!);
       if (res) {
         await handleApiResponse(res);
         toast({ title: "Report marked as resolved" });
