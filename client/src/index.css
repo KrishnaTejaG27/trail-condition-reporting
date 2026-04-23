@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -215,3 +217,118 @@
 .condition-other {
   @apply bg-gray-500 text-white;
 }
+
+/* Nature-inspired landing page styles */
+@layer base {
+  :root {
+    /* Earth tone palette extensions */
+    --earth-brown: 35 40% 35%;
+    --forest-dark: 142 50% 25%;
+    --sky-blue: 199 89% 48%;
+    --warm-cream: 40 20% 95%;
+    --stone-gray: 30 10% 60%;
+    --mountain-slate: 215 20% 40%;
+    --sunset-orange: 25 95% 53%;
+  }
+}
+
+/* Hero section gradient background */
+.hero-gradient {
+  background: linear-gradient(135deg, 
+    hsl(var(--warm-cream)) 0%, 
+    hsl(142 30% 90%) 25%, 
+    hsl(199 40% 92%) 50%, 
+    hsl(142 20% 88%) 75%, 
+    hsl(var(--warm-cream)) 100%
+  );
+}
+
+/* Feature card gradient backgrounds */
+.feature-card-live {
+  background: linear-gradient(135deg, hsl(142 50% 96%) 0%, hsl(160 40% 94%) 100%);
+}
+
+.feature-card-community {
+  background: linear-gradient(135deg, hsl(38 50% 96%) 0%, hsl(45 40% 94%) 100%);
+}
+
+.feature-card-safety {
+  background: linear-gradient(135deg, hsl(0 50% 96%) 0%, hsl(10 40% 94%) 100%);
+}
+
+.feature-card-maps {
+  background: linear-gradient(135deg, hsl(199 50% 96%) 0%, hsl(210 40% 94%) 100%);
+}
+
+/* CTA section gradient */
+.cta-gradient {
+  background: linear-gradient(135deg, 
+    hsl(142 40% 92%) 0%, 
+    hsl(160 30% 88%) 50%, 
+    hsl(142 35% 90%) 100%
+  );
+}
+
+/* Organic shape decorations */
+.organic-shape {
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+}
+
+/* Gentle hover lift animation */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px hsl(var(--primary) / 0.15);
+}
+
+/* Icon container with nature colors */
+.icon-container-live {
+  @apply p-3 rounded-2xl bg-emerald-100 text-emerald-600;
+}
+
+.icon-container-community {
+  @apply p-3 rounded-2xl bg-amber-100 text-amber-600;
+}
+
+.icon-container-safety {
+  @apply p-3 rounded-2xl bg-rose-100 text-rose-600;
+}
+
+.icon-container-maps {
+  @apply p-3 rounded-2xl bg-sky-100 text-sky-600;
+}
+
+/* Nature-inspired text shadow for hero */
+.hero-text-shadow {
+  text-shadow: 0 2px 4px hsl(var(--primary) / 0.1);
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Nature fade-in animation */
+@keyframes nature-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-nature-fade {
+  animation: nature-fade-in 0.8s ease-out forwards;
+}
+
+/* Staggered animation delays */
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+.animate-delay-400 { animation-delay: 400ms; }
