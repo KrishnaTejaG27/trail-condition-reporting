@@ -99,18 +99,26 @@ export const sendPushNotification = async (
   payload: NotificationPayload
 ): Promise<boolean> => {
   try {
+    console.log('Sending push notification to:', subscription.endpoint);
+    console.log('Subscription keys present:', !!subscription.keys);
     await webpush.sendNotification(
       subscription as any,
       JSON.stringify(payload)
     );
+    console.log('Push notification sent successfully');
     return true;
   } catch (error: any) {
+    console.error('Error sending push notification:', error);
+    console.error('Error details:', {
+      statusCode: error.statusCode,
+      message: error.message,
+      code: error.code,
+    });
+    
     // If subscription is expired/invalid, remove it
     if (error.statusCode === 410 || error.statusCode === 404) {
       await deleteSubscription(subscription.endpoint);
       console.log('Removed expired push subscription');
-    } else {
-      console.error('Error sending push notification:', error);
     }
     return false;
   }
@@ -124,6 +132,7 @@ export const sendNotificationToUser = async (
   let sentCount = 0;
   
   try {
+    console.log('Sending notification to user:', userId);
     // Get user subscriptions
     let subscriptions: PushSubscription[] = [];
     
@@ -133,6 +142,7 @@ export const sendNotificationToUser = async (
         const dbSubs = await prisma.pushSubscription.findMany({
           where: { userId },
         });
+        console.log('Found DB subscriptions:', dbSubs.length);
         subscriptions = dbSubs.map((sub: any) => ({
           endpoint: sub.endpoint,
           expirationTime: sub.expirationTime?.getTime(),
@@ -149,6 +159,7 @@ export const sendNotificationToUser = async (
     // If no subscriptions from DB, use mock
     if (subscriptions.length === 0) {
       const mockSubs = getUserSubscriptions(userId);
+      console.log('Found mock subscriptions:', mockSubs.length);
       subscriptions = mockSubs.map((sub: any) => ({
         endpoint: sub.endpoint,
         expirationTime: sub.expirationTime,
@@ -158,6 +169,8 @@ export const sendNotificationToUser = async (
         },
       }));
     }
+    
+    console.log('Total subscriptions to send to:', subscriptions.length);
     
     // Send to all user devices
     for (const subscription of subscriptions) {

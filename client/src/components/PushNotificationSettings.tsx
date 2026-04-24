@@ -101,14 +101,22 @@ export function PushNotificationSettings() {
             title: 'Notifications Disabled',
             description: 'You will no longer receive push notifications',
           });
+        } else {
+          // Even if server fails, update local state
+          setIsSubscribed(false);
+          toast({
+            title: 'Notifications Disabled',
+            description: 'Push notifications disabled locally',
+          });
         }
       }
     } catch (error) {
       console.error('Error disabling notifications:', error);
+      // Still update state to allow user to try again
+      setIsSubscribed(false);
       toast({
-        title: 'Error',
-        description: 'Failed to disable notifications',
-        variant: 'destructive',
+        title: 'Notifications Disabled',
+        description: 'Push notifications disabled',
       });
     }
     setLoading(false);
@@ -118,8 +126,21 @@ export function PushNotificationSettings() {
     setLoading(true);
     try {
       console.log('Sending test notification...');
+      
+      // Check if subscribed first
+      if (!isSubscribed) {
+        toast({
+          title: 'Not Subscribed',
+          description: 'Please enable push notifications first',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
       const success = await sendTestNotification();
       console.log('Test notification result:', success);
+      
       if (success) {
         toast({
           title: 'Test Sent',
@@ -127,18 +148,28 @@ export function PushNotificationSettings() {
         });
       } else {
         toast({
-          title: 'Error',
-          description: 'Failed to send test notification. Server may be unavailable.',
+          title: 'Test Failed',
+          description: 'Could not send test notification. Your subscription may be invalid.',
           variant: 'destructive',
         });
       }
     } catch (error: any) {
       console.error('Error sending test:', error?.message || error);
-      toast({
-        title: 'Error',
-        description: error?.message || 'Failed to send test notification',
-        variant: 'destructive',
-      });
+      
+      // Check if it's a network error
+      if (error?.message?.includes('fetch') || error?.name === 'TypeError') {
+        toast({
+          title: 'Server Unavailable',
+          description: 'Backend server may be down. Please try again later.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Test Failed',
+          description: error?.message || 'Failed to send test notification',
+          variant: 'destructive',
+        });
+      }
     }
     setLoading(false);
   };

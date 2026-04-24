@@ -598,44 +598,69 @@ export const uploadPhoto = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Try to upload to S3 with 3-second timeout, fall back to mock URL if S3 not configured
+    // Use S3 if configured, otherwise save to local disk
     let photoUrl: string;
     let thumbnailUrl: string;
     let fileSize = req.file.size;
     let width = 0;
     let height = 0;
     
-    try {
-      // Add 3-second timeout to S3 upload
-      const s3Promise = uploadToS3(
-        req.file.buffer,
-        req.file.originalname,
-        req.user!.id,
-        {
-          maxWidth: 1920,
-          maxHeight: 1080,
-          quality: 80,
-          generateThumbnail: true,
-        }
-      );
+    const useS3 = process.env.USE_S3_STORAGE === 'true';
+    
+    if (useS3) {
+      try {
+        // Try S3 upload with timeout
+        const s3Promise = uploadToS3(
+          req.file.buffer,
+          req.file.originalname,
+          req.user!.id,
+          {
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 80,
+            generateThumbnail: true,
+          }
+        );
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('S3 upload timeout')), 5000)
+        );
+        
+        const s3Result = await Promise.race([s3Promise, timeoutPromise]) as any;
+        photoUrl = s3Result.url;
+        thumbnailUrl = s3Result.thumbnailUrl || s3Result.url;
+        fileSize = s3Result.fileSizeBytes;
+        width = s3Result.width;
+        height = s3Result.height;
+        console.log('S3 upload successful:', photoUrl);
+      } catch (s3Error) {
+        console.log('S3 upload failed, falling back to local storage:', s3Error);
+        // Fall through to local storage
+      }
+    }
+    
+    // Local storage fallback or default
+    if (!photoUrl) {
+      const fs = require('fs');
+      const path = require('path');
+      const uploadsDir = path.join(process.cwd(), 'uploads');
       
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('S3 upload timeout')), 3000)
-      );
+      // Ensure uploads directory exists
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
       
-      const s3Result = await Promise.race([s3Promise, timeoutPromise]) as any;
-      photoUrl = s3Result.url;
-      thumbnailUrl = s3Result.thumbnailUrl || s3Result.url;
-      fileSize = s3Result.fileSizeBytes;
-      width = s3Result.width;
-      height = s3Result.height;
-      console.log('S3 upload successful');
-    } catch (s3Error) {
-      // S3 not available or timeout, use data URL for mock mode
-      console.log('S3 upload failed or timeout, using mock image URL:', s3Error);
-      const base64Image = req.file.buffer.toString('base64');
-      photoUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+      // Generate unique filename
+      const filename = `${Date.now()}_${req.file.originalname}`;
+      const filepath = path.join(uploadsDir, filename);
+      
+      // Write file to disk
+      fs.writeFileSync(filepath, req.file.buffer);
+      
+      // Return relative URL for static file serving
+      photoUrl = `/uploads/${filename}`;
       thumbnailUrl = photoUrl;
+      console.log('Photo saved to local disk:', photoUrl);
     }
 
     // Try database first, fall back to mock
