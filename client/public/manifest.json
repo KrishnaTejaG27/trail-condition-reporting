@@ -1,0 +1,48 @@
+{
+  "id": "/",
+  "name": "Trail Condition Reporting",
+  "short_name": "TrailWatch",
+  "description": "Report and track trail conditions for safer outdoor adventures",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/boots.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["utilities", "travel"],
+  "shortcuts": [
+    {
+      "name": "Create Report",
+      "short_name": "Report",
+      "description": "Create a new trail condition report",
+      "url": "/app/reports/create",
+      "icons": [
+        {
+          "src": "/boots.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "View Reports",
+      "short_name": "Reports",
+      "description": "View all trail condition reports",
+      "url": "/app/reports",
+      "icons": [
+        {
+          "src": "/boots.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
