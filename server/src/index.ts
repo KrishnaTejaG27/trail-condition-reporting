@@ -5,8 +5,8 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import rateLimit from 'express-rate-limit';
 
-// Using mock auth routes for testing without database
-import authRoutes from '@/routes/mockAuth';
+// Using real auth routes with database
+import authRoutes from '@/routes/auth';
 import userRoutes from '@/routes/users';
 import reportRoutes from '@/routes/reports';
 import trailRoutes from '@/routes/trails';
@@ -16,6 +16,9 @@ import adminRoutes from '@/routes/admin';
 import userStatsRoutes from '@/routes/userStats';
 import trailImportRoutes from '@/routes/trailImport';
 import pushRoutes from '@/routes/push';
+import weatherRoutes from '@/routes/weather';
+import aiClassificationRoutes from '@/routes/aiClassification';
+import inAppNotificationRoutes from '@/routes/inAppNotifications';
 import { errorHandler } from '@/middleware/errorHandler';
 import { notFound } from '@/middleware/notFound';
 import { seedTrails } from '@/controllers/trailController';
@@ -66,6 +69,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userStatsRoutes);
 app.use('/api/trails/import', trailImportRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/weather', weatherRoutes);
+app.use('/api/ai', aiClassificationRoutes);
+app.use('/api/in-app', inAppNotificationRoutes);
 
 // Seed sample trails on startup
 seedTrails();
