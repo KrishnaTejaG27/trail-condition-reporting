@@ -419,7 +419,7 @@ export const handleApiResponse = async (response: Response) => {
   if (!response.ok) {
     // Include validation details in error message
     let errorMessage = data.error || data.message || `API request failed (${response.status})`;
-    if (data.details && data.details.length > 0) {
+    if (data.details && Array.isArray(data.details) && data.details.length > 0) {
       const details = data.details.map((d: any) => `${d.field}: ${d.message}`).join(', ');
       errorMessage += ` - ${details}`;
     }

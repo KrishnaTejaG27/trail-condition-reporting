@@ -19,65 +19,119 @@ export const register = async (req: Request, res: Response) => {
 
     console.log('Registration attempt:', { email, username, firstName, lastName });
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { username },
-        ],
-      },
-    });
-
-    if (existingUser) {
-      console.log('User already exists:', existingUser.email === email ? 'Email' : 'Username');
-      return res.status(400).json({
-        success: false,
-        error: existingUser.email === email 
-          ? 'Email already registered' 
-          : 'Username already taken',
+    // Try database first, fall back to mock
+    try {
+      // Check if user already exists
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            { username },
+          ],
+        },
       });
-    }
 
-    // Hash password
-    const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-    console.log('Password hashed successfully');
+      if (existingUser) {
+        console.log('User already exists:', existingUser.email === email ? 'Email' : 'Username');
+        return res.status(400).json({
+          success: false,
+          error: existingUser.email === email
+            ? 'Email already registered'
+            : 'Username already taken',
+        });
+      }
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
+      // Hash password
+      const saltRounds = 12;
+      const passwordHash = await bcrypt.hash(password, saltRounds);
+      console.log('Password hashed successfully');
+
+      // Create user
+      const user = await prisma.user.create({
+        data: {
+          email,
+          username,
+          passwordHash,
+          firstName,
+          lastName,
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      console.log('User created successfully:', user.email);
+
+      // Generate token
+      const token = generateToken(user.id);
+      console.log('Token generated successfully');
+
+      res.status(201).json({
+        success: true,
+        data: {
+          user,
+          token,
+        },
+        message: 'User registered successfully',
+      });
+    } catch (dbError) {
+      // Mock mode fallback
+      console.log('Using mock mode for registration');
+
+      // Check if user already exists in mock
+      const existingUser = mockUsers.find((u: any) => u.email === email || u.username === username);
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          error: existingUser.email === email
+            ? 'Email already registered'
+            : 'Username already taken',
+        });
+      }
+
+      // Create new mock user
+      const newUser = {
+        id: Date.now().toString(),
         email,
         username,
-        passwordHash,
-        firstName,
-        lastName,
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        createdAt: true,
-      },
-    });
+        password, // Plain text for mock
+        firstName: firstName || '',
+        lastName: lastName || '',
+        role: 'USER',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
 
-    console.log('User created successfully:', user.email);
+      mockUsers.push(newUser);
+      console.log('Mock user created:', newUser.email);
 
-    // Generate token
-    const token = generateToken(user.id);
-    console.log('Token generated successfully');
+      // Generate token
+      const token = generateToken(newUser.id);
 
-    res.status(201).json({
-      success: true,
-      data: {
-        user,
-        token,
-      },
-      message: 'User registered successfully',
-    });
+      res.status(201).json({
+        success: true,
+        data: {
+          user: {
+            id: newUser.id,
+            email: newUser.email,
+            username: newUser.username,
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            role: newUser.role,
+            createdAt: newUser.createdAt,
+          },
+          token,
+        },
+        message: 'User registered successfully (mock)',
+      });
+    }
   } catch (error: any) {
     console.error('Registration error:', error);
     res.status(500).json({

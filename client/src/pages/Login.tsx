@@ -45,6 +45,9 @@ const Login = () => {
         <div className="bg-card rounded-lg shadow-lg p-8">
           {/* Header */}
           <div className="text-center mb-8">
+            <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-4">
+              ← Back to Home
+            </Link>
             <div className="flex justify-center mb-4">
               <div className="p-3 bg-primary/10 rounded-full">
                 <Shield className="h-8 w-8 text-primary" />
@@ -69,7 +72,7 @@ const Login = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2 bg-background text-foreground border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
                   placeholder="Enter your email"
                   required
                 />
@@ -87,7 +90,7 @@ const Login = () => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2 bg-background text-foreground border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
                   placeholder="Enter your password"
                   required
                 />
