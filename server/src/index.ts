@@ -7,8 +7,8 @@ import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { initializeSocket } from '@/services/socketService';
 
-// Using mock auth routes for testing without database
-import authRoutes from '@/routes/mockAuth';
+// Using real auth routes with database
+import authRoutes from '@/routes/auth';
 import userRoutes from '@/routes/users';
 import reportRoutes from '@/routes/reports';
 import trailRoutes from '@/routes/trails';
