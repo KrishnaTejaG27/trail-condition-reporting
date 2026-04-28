@@ -16,6 +16,8 @@ import AdminPanel from './pages/AdminPanel';
 import AdminDashboard from './pages/AdminDashboard';
 import UserProfile from './pages/UserProfile';
 import Trails from './pages/Trails';
+import TrailDetail from './pages/TrailDetail';
+import Analytics from './pages/Analytics';
 
 // Components
 import Layout from '@/components/Layout';
@@ -55,9 +57,11 @@ function App() {
               <Route path="reports/:id" element={<ReportDetail />} />
               <Route path="reports/create" element={<CreateReport />} />
               <Route path="trails" element={<Trails />} />
+              <Route path="trails/:trailId" element={<TrailDetail />} />
               <Route path="profile" element={<Profile />} />
               <Route path="admin" element={<AdminDashboard />} />
               <Route path="admin/panel" element={<AdminPanel />} />
+              <Route path="analytics" element={<Analytics />} />
               <Route path="users/:id" element={<UserProfile />} />
             </Route>
           </Routes>

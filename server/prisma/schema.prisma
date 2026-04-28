@@ -36,6 +36,7 @@ model User {
   createdAlerts     Alert[]
   auditLogs         AuditLog[]
   pushSubscriptions PushSubscription[]
+  notifications     Notification[]
 
   @@map("users")
 }
@@ -107,6 +108,7 @@ model Report {
   votes      Vote[]
   alerts     Alert[]
   resolver   User?    @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
+  notifications Notification[]
 
   @@map("reports")
 }
@@ -144,10 +146,11 @@ model Comment {
   isActive       Boolean  @default(true) @map("is_active")
 
   // Relations
-  report        Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parentComment Comment? @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
-  replies       Comment[] @relation("CommentReplies")
+  report        Report        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentComment Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       Comment[]     @relation("CommentReplies")
+  notifications Notification[]
 
   @@map("comments")
 }
@@ -224,6 +227,28 @@ model PushSubscription {
 
   @@unique([userId, endpoint])
   @@map("push_subscriptions")
+}
+
+model Notification {
+  id           String              @id @default(uuid())
+  userId       String              @map("user_id")
+  type         NotificationType
+  title        String
+  message      String
+  reportId     String?             @map("report_id")
+  commentId    String?             @map("comment_id")
+  actorId      String?             @map("actor_id") // User who triggered the notification
+  isRead       Boolean             @default(false) @map("is_read")
+  readAt       DateTime?           @map("read_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report  Report?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }
 
 model AuditLog {
@@ -329,4 +354,11 @@ enum ActionType {
   LOGOUT
   REGISTER
   PASSWORD_RESET
+}
+
+enum NotificationType {
+  REPORT_VERIFIED
+  REPORT_COMMENTED
+  REPORT_RESOLVED
+  MENTION
 }

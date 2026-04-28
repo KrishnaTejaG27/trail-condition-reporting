@@ -165,7 +165,7 @@ export const NotificationCenter = ({ isOpen, onClose }: NotificationCenterProps)
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="absolute right-4 top-16 w-full max-w-md bg-white rounded-lg shadow-xl max-h-[80vh] flex flex-col">
+      <div className="absolute right-4 top-16 w-full max-w-md bg-background rounded-lg shadow-xl max-h-[80vh] flex flex-col border">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold">Notifications</h2>
@@ -185,7 +185,7 @@ export const NotificationCenter = ({ isOpen, onClose }: NotificationCenterProps)
                 Mark all read
               </button>
             )}
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <button onClick={onClose} className="p-1 hover:bg-accent rounded">
               <X size={20} />
             </button>
           </div>
@@ -194,10 +194,10 @@ export const NotificationCenter = ({ isOpen, onClose }: NotificationCenterProps)
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-4 text-center text-gray-500">Loading...</div>
+            <div className="p-4 text-center text-muted-foreground">Loading...</div>
           ) : notifications.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <Bell size={48} className="mx-auto mb-4 text-gray-300" />
+            <div className="p-8 text-center text-muted-foreground">
+              <Bell size={48} className="mx-auto mb-4 text-muted-foreground/30" />
               <p>No notifications yet</p>
             </div>
           ) : (
@@ -205,8 +205,8 @@ export const NotificationCenter = ({ isOpen, onClose }: NotificationCenterProps)
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-4 hover:bg-gray-50 transition-colors ${
-                    !notification.isRead ? 'bg-blue-50' : ''
+                  className={`p-4 hover:bg-accent/50 transition-colors ${
+                    !notification.isRead ? 'bg-primary/10' : ''
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -216,15 +216,15 @@ export const NotificationCenter = ({ isOpen, onClose }: NotificationCenterProps)
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-medium text-sm">{notification.title}</h3>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
                           {formatTime(notification.createdAt)}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-foreground/80 mt-1">
                         {notification.message}
                       </p>
                       {notification.comment && (
-                        <p className="text-sm text-gray-500 mt-1 italic">
+                        <p className="text-sm text-muted-foreground mt-1 italic">
                           "{notification.comment.content}"
                         </p>
                       )}

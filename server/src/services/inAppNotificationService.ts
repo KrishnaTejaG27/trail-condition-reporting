@@ -1,5 +1,6 @@
 import { createNotification } from '@/routes/inAppNotifications';
 import { mockUsers } from '@/mockDbFile';
+import { emitNotification } from '@/services/socketService';
 
 // Mock notification storage
 const mockNotifications: any[] = [];
@@ -31,6 +32,9 @@ export const notifyUser = async (data: {
     };
     mockNotifications.push(notification);
     console.log('Mock notification created:', notification);
+    
+    // Emit real-time notification via socket
+    emitNotification(data.userId, notification);
   }
 };
 

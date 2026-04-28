@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, AlertTriangle } from 'lucide-react';
+import { MapPin, AlertTriangle, Layers } from 'lucide-react';
+import HeatmapView from '@/components/HeatmapView';
 
 // Fix Leaflet default icon issue
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -84,6 +85,8 @@ function MapCenterUpdater({ userLocation }: { userLocation: { lat: number; lng: 
 }
 
 export function MapView({ reports, userLocation, onReportClick }: MapViewProps) {
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  
   // Default center (San Francisco coordinates)
   const defaultCenter: [number, number] = userLocation 
     ? [userLocation.lat, userLocation.lng] 
@@ -92,10 +95,21 @@ export function MapView({ reports, userLocation, onReportClick }: MapViewProps) 
   return (
     <Card className="w-full h-[500px]">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <MapPin className="h-5 w-5" />
-          Trail Map
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Trail Map
+          </CardTitle>
+          <Button
+            size="sm"
+            variant={showHeatmap ? "default" : "outline"}
+            onClick={() => setShowHeatmap(!showHeatmap)}
+            className="flex items-center gap-2"
+          >
+            <Layers className="w-4 h-4" />
+            {showHeatmap ? 'Hide Heatmap' : 'Show Heatmap'}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0 h-[calc(100%-60px)]">
         <MapContainer
@@ -108,7 +122,10 @@ export function MapView({ reports, userLocation, onReportClick }: MapViewProps) 
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          
+
+          {/* Heatmap Layer */}
+          {showHeatmap && <HeatmapView reports={reports} />}
+
           <MapCenterUpdater userLocation={userLocation || null} />
           
           {/* User location marker */}
@@ -153,10 +170,10 @@ export function MapView({ reports, userLocation, onReportClick }: MapViewProps) 
                         {report.conditionType?.replace('_', ' ')}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600 mb-2">
+                    <p className="text-xs text-foreground/80 mb-2">
                       {report.description}
                     </p>
-                    <div className="text-xs text-gray-500 mb-2">
+                    <div className="text-xs text-muted-foreground mb-2">
                       <p>Severity: <span className={getSeverityColor(report.severityLevel)}>{report.severityLevel}</span></p>
                       <p>Reported by: {report.user?.firstName || report.user?.username || 'Unknown'}</p>
                       <p>{new Date(report.createdAt).toLocaleDateString()}</p>

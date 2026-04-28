@@ -17,6 +17,7 @@ const defaultData = {
       lastName: 'User',
       role: 'USER',
       isActive: true,
+      reputationPoints: 50,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
@@ -30,6 +31,7 @@ const defaultData = {
       lastName: 'User',
       role: 'ADMIN',
       isActive: true,
+      reputationPoints: 100,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -47,10 +49,19 @@ function loadData() {
     if (fs.existsSync(DATA_FILE)) {
       const rawData = fs.readFileSync(DATA_FILE, 'utf-8');
       const loaded = JSON.parse(rawData);
-      // Ensure all arrays exist
+      const reports = loaded.reports || defaultData.reports;
+      // Ensure all arrays exist and calculate reputation points
+      const users = (loaded.users || defaultData.users).map((user: any) => {
+        const userReports = reports.filter((r: any) => r.userId === user.id);
+        const calculatedPoints = userReports.length * 10; // 10 points per report
+        return {
+          ...user,
+          reputationPoints: user.reputationPoints || calculatedPoints || 0
+        };
+      });
       return {
-        users: loaded.users || defaultData.users,
-        reports: loaded.reports || defaultData.reports,
+        users,
+        reports,
         photos: loaded.photos || defaultData.photos,
         votes: loaded.votes || [],
         comments: loaded.comments || [],

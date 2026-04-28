@@ -281,8 +281,20 @@ export const api = {
       fetch(`${API_BASE_URL}/push/vapid-public-key`),
     
     subscribe: (subscription: any) => {
-      const token = localStorage.getItem('token');
-      console.log('Push subscribe - token:', token ? 'present' : 'missing');
+      // Get token from Zustand auth store (stored under 'auth-storage' key)
+      const authStorage = localStorage.getItem('auth-storage');
+      let token = null;
+      
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage);
+          token = authData.state?.token;
+        } catch (e) {
+          console.log('Failed to parse auth storage');
+        }
+      }
+      
+      console.log('Push subscribe - token:', token ? `present (length: ${token.length})` : 'missing from auth-storage');
       if (!token) {
         return Promise.reject(new Error('No authentication token'));
       }
@@ -297,7 +309,20 @@ export const api = {
     },
     
     unsubscribe: (endpoint: string) => {
-      const token = localStorage.getItem('token');
+      // Get token from Zustand auth store (stored under 'auth-storage' key)
+      const authStorage = localStorage.getItem('auth-storage');
+      let token = null;
+      
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage);
+          token = authData.state?.token;
+        } catch (e) {
+          console.log('Failed to parse auth storage');
+        }
+      }
+      
+      console.log('Push unsubscribe - token:', token ? `present (length: ${token.length})` : 'missing from auth-storage');
       if (!token) {
         return Promise.reject(new Error('No authentication token'));
       }
@@ -312,16 +337,58 @@ export const api = {
     },
     
     test: () => {
-      const token = localStorage.getItem('token');
-      console.log('Push test - token:', token ? 'present' : 'missing');
-      if (!token) {
-        return Promise.reject(new Error('No authentication token'));
+      // Get token from Zustand auth store (stored under 'auth-storage' key)
+      const authStorage = localStorage.getItem('auth-storage');
+      let token = null;
+      
+      if (authStorage) {
+        try {
+          const authData = JSON.parse(authStorage);
+          token = authData.state?.token;
+        } catch (e) {
+          console.log('Failed to parse auth storage');
+        }
+      }
+      
+      console.log('Push test - token:', token ? `present (length: ${token.length})` : 'missing from auth-storage');
+      if (!token || token.length === 0) {
+        return Promise.reject(new Error('No authentication token found. Please log in again.'));
       }
       return fetch(`${API_BASE_URL}/push/test`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
+      });
+    },
+  },
+
+  // Weather API
+  weather: {
+    getWeather: (lat: number, lng: number) => {
+      return fetch(`${API_BASE_URL}/weather?lat=${lat}&lng=${lng}`);
+    },
+  },
+
+  // AI Classification API
+  ai: {
+    classifyHazard: (description: string, hazardType: string) => {
+      return fetch(`${API_BASE_URL}/ai/classify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ description, hazardType }),
+      });
+    },
+    batchClassify: (reports: Array<{ description: string; hazardType: string }>) => {
+      return fetch(`${API_BASE_URL}/ai/batch-classify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reports }),
       });
     },
   },
@@ -329,17 +396,34 @@ export const api = {
 
 // Helper function to handle API responses
 export const handleApiResponse = async (response: Response) => {
+  // DEBUG: Log the response status and headers
+  console.log('API Response:', response.status, response.statusText);
+  console.log('Content-Type:', response.headers.get('content-type'));
+  
   // Check if response is JSON
   const contentType = response.headers.get('content-type');
   if (!contentType || !contentType.includes('application/json')) {
     const text = await response.text();
+    console.error('Non-JSON response:', text.slice(0, 200));
     throw new Error(`Server returned non-JSON response: ${text.slice(0, 100)}`);
   }
   
   const data = await response.json();
+  console.log('Response data:', data);
+  
+  // DEBUG: Log validation error details
+  if (data.details && Array.isArray(data.details)) {
+    console.error('Validation errors:', JSON.stringify(data.details, null, 2));
+  }
   
   if (!response.ok) {
-    throw new Error(data.error || data.message || `API request failed (${response.status})`);
+    // Include validation details in error message
+    let errorMessage = data.error || data.message || `API request failed (${response.status})`;
+    if (data.details && data.details.length > 0) {
+      const details = data.details.map((d: any) => `${d.field}: ${d.message}`).join(', ');
+      errorMessage += ` - ${details}`;
+    }
+    throw new Error(errorMessage);
   }
   
   return data;

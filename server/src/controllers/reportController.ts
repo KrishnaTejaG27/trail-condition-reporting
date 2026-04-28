@@ -3,7 +3,10 @@ import { prisma } from '@/index';
 import { sendNotificationToNearbyUsers, NotificationTemplates } from '@/services/pushService';
 import { AuthRequest } from '@/middleware/auth';
 import { mockReports, mockPhotos, mockUsers, addReport, addPhoto, addComment, getComments, getCommentCount, deleteComment as deleteCommentFromDb, addVote, removeVote, hasUserVoted, getVoteCount, updateReport as updateReportInMock, generateUniqueId } from '@/mockDb';
+import { dbMockTrails } from '@/controllers/trailController';
 import { uploadToS3 } from '@/services/s3Service';
+import { notifyReportCommented, notifyReportVerified, notifyReportResolved } from '@/services/inAppNotificationService';
+import { emitReportCreated, emitReportUpdated, emitReportDeleted, emitVoteUpdated, emitCommentAdded } from '@/services/socketService';
 
 // Get all reports (with filtering and pagination)
 export const getReports = async (req: AuthRequest, res: Response) => {
@@ -116,12 +119,21 @@ export const getReports = async (req: AuthRequest, res: Response) => {
       reports = reports.map(r => {
         const reportPhotos = mockPhotos.filter(p => p.reportId === r.id);
         console.log(`Report ${r.id} photos:`, reportPhotos.length);
+        
+        // Look up actual user from mockUsers
+        const reportUser = mockUsers.find((u: any) => u.id === r.userId);
+        
         return {
           ...r,
-          user: {
+          user: reportUser ? {
+            id: reportUser.id,
+            username: reportUser.username,
+            firstName: reportUser.firstName,
+            profileImageUrl: reportUser.profileImageUrl,
+          } : {
             id: r.userId,
-            username: 'testuser',
-            firstName: 'Test',
+            username: 'unknown',
+            firstName: 'Unknown',
             profileImageUrl: null,
           },
           trail: r.trailId ? { id: r.trailId, name: 'Mock Trail', parkId: '1' } : null,
@@ -265,7 +277,15 @@ export const getReport = async (req: AuthRequest, res: Response) => {
               profileImageUrl: user.profileImageUrl,
               reputationPoints: 0,
             } : null,
-            trail: mockReport.trailId ? { id: mockReport.trailId, name: 'Mock Trail', description: null, park: { id: '1', name: 'Mock Park' } } : null,
+            trail: mockReport.trailId ? (() => {
+              const trail = dbMockTrails.find((t: any) => t.id === mockReport.trailId);
+              return trail ? {
+                id: trail.id,
+                name: trail.name,
+                description: trail.description,
+                park: { id: '1', name: 'Yosemite National Park' }
+              } : { id: mockReport.trailId, name: 'Unknown Trail', description: null, park: { id: '1', name: 'Mock Park' } };
+            })() : null,
             photos: photos,
             _count: {
               votes: getVoteCount(id),
@@ -333,6 +353,9 @@ export const createReport = async (req: AuthRequest, res: Response) => {
         },
       });
 
+      // Emit real-time event for database path too!
+      emitReportCreated(report);
+
       res.status(201).json({
         success: true,
         data: { report },
@@ -340,6 +363,9 @@ export const createReport = async (req: AuthRequest, res: Response) => {
       });
     } catch (dbError) {
       // Database not available, use mock
+      // Look up actual user from mockUsers for proper name
+      const currentUser = mockUsers.find((u: any) => u.id === req.user!.id);
+      
       const newReport = {
         id: generateUniqueId(),
         userId: req.user!.id,
@@ -353,10 +379,15 @@ export const createReport = async (req: AuthRequest, res: Response) => {
         isResolved: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        user: {
+        user: currentUser ? {
+          id: currentUser.id,
+          username: currentUser.username,
+          firstName: currentUser.firstName,
+          profileImageUrl: currentUser.profileImageUrl,
+        } : {
           id: req.user!.id,
           username: req.user!.username,
-          firstName: 'Mock',
+          firstName: req.user!.username,
           profileImageUrl: null,
         },
         trail: trailId ? { id: trailId, name: 'Mock Trail' } : null,
@@ -365,29 +396,40 @@ export const createReport = async (req: AuthRequest, res: Response) => {
 
       addReport(newReport);
 
-      // Send push notifications to nearby users
-      if (newReport.location?.coordinates) {
-        const [lng, lat] = newReport.location.coordinates;
-        const payload = NotificationTemplates.newHazardNearby(
-          newReport.conditionType,
-          'nearby'
-        );
-        payload.data = { 
-          type: 'new-hazard', 
-          reportId: newReport.id,
-          coordinates: newReport.location.coordinates 
-        };
-        
-        // Send to nearby users (2km radius, excluding creator)
-        sendNotificationToNearbyUsers(lat, lng, 2, req.user!.id, payload)
-          .then(sent => {
-            if (sent > 0) {
-              console.log(`Push notification sent to ${sent} nearby user(s)`);
-            }
-          })
-          .catch(err => {
-            console.error('Error sending push notifications:', err);
-          });
+      // Send push notifications to nearby users (wrapped in try-catch to prevent crash)
+      try {
+        if (newReport.location?.coordinates) {
+          const [lng, lat] = newReport.location.coordinates;
+          const payload = NotificationTemplates.newHazardNearby(
+            newReport.conditionType,
+            'nearby'
+          );
+          payload.data = { 
+            type: 'new-hazard', 
+            reportId: newReport.id,
+            coordinates: newReport.location.coordinates 
+          };
+          
+          // Send to nearby users (2km radius, excluding creator)
+          sendNotificationToNearbyUsers(lat, lng, 2, req.user!.id, payload)
+            .then(sent => {
+              if (sent > 0) {
+                console.log(`Push notification sent to ${sent} nearby user(s)`);
+              }
+            })
+            .catch(err => {
+              console.error('Error sending push notifications:', err);
+            });
+        }
+      } catch (notifyError) {
+        console.error('Notification error:', notifyError);
+      }
+
+      // Emit real-time event (wrapped in try-catch to prevent crash)
+      try {
+        emitReportCreated(newReport);
+      } catch (socketError) {
+        console.error('Socket emit error:', socketError);
       }
 
       res.status(201).json({
@@ -469,6 +511,14 @@ export const updateReport = async (req: AuthRequest, res: Response) => {
         },
       });
 
+      // Notify report owner about resolution (database mode)
+      if (isResolved && existingReport.userId !== req.user!.id) {
+        await notifyReportResolved(id, existingReport.userId, req.user!.id);
+      }
+
+      // Emit real-time event for database path too!
+      emitReportUpdated(report);
+
       res.json({
         success: true,
         data: { report },
@@ -506,6 +556,11 @@ export const updateReport = async (req: AuthRequest, res: Response) => {
         if (isResolved) {
           updateData.resolvedAt = new Date().toISOString();
           updateData.resolvedBy = req.user!.id;
+          
+          // Notify report owner about resolution (mock mode)
+          if (mockReport.userId !== req.user!.id) {
+            await notifyReportResolved(id, mockReport.userId, req.user!.id);
+          }
         }
       }
       if (resolutionNotes !== undefined) updateData.resolutionNotes = resolutionNotes;
@@ -515,19 +570,24 @@ export const updateReport = async (req: AuthRequest, res: Response) => {
       // Get user and trail info for response
       const user = mockUsers.find((u: any) => u.id === updatedReport?.userId);
 
+      const reportWithUser = {
+        ...updatedReport,
+        user: user ? {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          profileImageUrl: user.profileImageUrl,
+        } : null,
+        trail: updatedReport?.trailId ? { id: updatedReport.trailId, name: 'Mock Trail' } : null,
+      };
+
+      // Emit real-time event
+      emitReportUpdated(reportWithUser);
+
       res.json({
         success: true,
         data: { 
-          report: {
-            ...updatedReport,
-            user: user ? {
-              id: user.id,
-              username: user.username,
-              firstName: user.firstName,
-              profileImageUrl: user.profileImageUrl,
-            } : null,
-            trail: updatedReport?.trailId ? { id: updatedReport.trailId, name: 'Mock Trail' } : null,
-          }
+          report: reportWithUser
         },
         message: 'Report updated successfully (mock)',
       });
@@ -569,9 +629,15 @@ export const deleteReport = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Get trailId for socket emit
+    const trailId = (existingReport as any).trailId;
+
     await prisma.report.delete({
       where: { id },
     });
+
+    // Emit real-time event
+    emitReportDeleted(id, trailId);
 
     res.json({
       success: true,
@@ -805,6 +871,9 @@ export const upvoteReport = async (req: AuthRequest, res: Response) => {
         where: { reportId: id },
       });
 
+      // Emit real-time vote update
+      emitVoteUpdated(id, voteCount);
+
       res.status(201).json({
         success: true,
         data: { vote, voteCount },
@@ -828,6 +897,15 @@ export const upvoteReport = async (req: AuthRequest, res: Response) => {
 
       addVote(vote);
       const voteCount = getVoteCount(id);
+
+      // Notify report owner about verification (mock mode)
+      const report = mockReports.find((r: any) => r.id === id);
+      if (report && report.userId !== userId) {
+        await notifyReportVerified(id, report.userId, userId);
+      }
+
+      // Emit real-time vote update
+      emitVoteUpdated(id, voteCount);
 
       res.status(201).json({
         success: true,
@@ -975,6 +1053,20 @@ export const addReportComment = async (req: AuthRequest, res: Response) => {
         },
       });
 
+      // Emit real-time comment event
+      emitCommentAdded(id, comment);
+
+      // Notify report owner about the comment
+      const report = await prisma.report.findUnique({
+        where: { id },
+        select: { userId: true },
+      });
+      console.log('Comment created - checking notification trigger:', { reportId: id, commentId: comment.id, commentAuthorId: userId, reportOwnerId: report?.userId });
+      if (report && report.userId !== userId) {
+        console.log('Triggering notification for comment');
+        await notifyReportCommented(id, comment.id, userId, report.userId);
+      }
+
       res.status(201).json({
         success: true,
         data: { comment },
@@ -994,6 +1086,26 @@ export const addReportComment = async (req: AuthRequest, res: Response) => {
       addComment(comment);
 
       const user = mockUsers.find((u: any) => u.id === userId);
+
+      // Emit real-time comment event (mock mode)
+      const commentWithUser = {
+        ...comment,
+        user: user ? {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          username: user.username,
+        } : null,
+      };
+      emitCommentAdded(id, commentWithUser);
+
+      // Notify report owner about the comment (mock mode)
+      const report = mockReports.find((r: any) => r.id === id);
+      console.log('Mock comment created - checking notification trigger:', { reportId: id, commentId: comment.id, commentAuthorId: userId, reportOwnerId: report?.userId });
+      if (report && report.userId !== userId) {
+        console.log('Triggering mock notification for comment');
+        await notifyReportCommented(id, comment.id, userId, report.userId);
+      }
 
       res.status(201).json({
         success: true,

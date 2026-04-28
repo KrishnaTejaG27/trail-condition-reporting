@@ -136,8 +136,8 @@ export function Comments({ reportId, commentCount }: CommentsProps) {
   const isCommentOwner = (comment: Comment) => comment.user?.id === user?.id;
 
   return (
-    <div className="border-t border-gray-200 pt-4 mt-4">
-      <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm text-gray-700">
+    <div className="border-t pt-4 mt-4">
+      <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm text-foreground">
         <MessageSquare className="h-4 w-4" />
         Comments ({comments.length || commentCount})
       </h4>
@@ -149,14 +149,14 @@ export function Comments({ reportId, commentCount }: CommentsProps) {
       ) : (
         <div className="space-y-2 max-h-32 overflow-y-auto mb-3">
           {comments.map((comment) => (
-            <div key={comment.id} className="bg-gray-50 p-2 rounded border border-gray-100">
+            <div key={comment.id} className="bg-muted/50 p-2 rounded border">
               {editingId === comment.id ? (
                 <div className="space-y-2">
                   <input
                     type="text"
                     value={editContent}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditContent(e.target.value)}
-                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1 border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <div className="flex gap-2 justify-end">
                     <Button
@@ -182,20 +182,20 @@ export function Comments({ reportId, commentCount }: CommentsProps) {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-800">{comment.content}</p>
+                  <p className="text-sm">{comment.content}</p>
                   <div className="flex justify-between items-center mt-1">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted-foreground">
                       {comment.user?.firstName}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-muted-foreground/60">
                         {new Date(comment.createdAt).toLocaleDateString()}
                       </span>
                       {isCommentOwner(comment) && token && (
                         <div className="flex gap-1">
                           <button
                             onClick={() => startEdit(comment)}
-                            className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700 transition-colors"
+                            className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                             title="Edit"
                           >
                             <Pencil className="h-3 w-3" />
@@ -203,7 +203,7 @@ export function Comments({ reportId, commentCount }: CommentsProps) {
                           <button
                             onClick={() => handleDelete(comment.id)}
                             disabled={deletingId === comment.id}
-                            className="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600 transition-colors"
+                            className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors"
                             title="Delete"
                           >
                             {deletingId === comment.id ? (
@@ -230,7 +230,7 @@ export function Comments({ reportId, commentCount }: CommentsProps) {
             placeholder="Add comment..."
             value={newComment}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewComment(e.target.value)}
-            className="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 px-3 py-2 border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <Button type="submit" size="sm" disabled={submitting || !newComment.trim()} className="px-3 py-1 h-8">
             {submitting ? (

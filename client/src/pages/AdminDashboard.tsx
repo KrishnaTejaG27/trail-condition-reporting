@@ -76,6 +76,8 @@ export default function AdminDashboard() {
   const [severityData, setSeverityData] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const { token, user } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -125,8 +127,12 @@ export default function AdminDashboard() {
       if (reportsRes) {
         const reportsData = await handleApiResponse(reportsRes);
         if (reportsData.success) {
-          setReports(reportsData.data?.reports || []);
-          processChartData(reportsData.data?.reports || []);
+          // Sort by newest first
+          const sortedReports = (reportsData.data?.reports || []).sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          setReports(sortedReports);
+          processChartData(sortedReports);
         }
       }
     } catch (error) {
@@ -233,6 +239,16 @@ export default function AdminDashboard() {
     } catch (error) {
       toast({ title: "Failed to resolve report", variant: "destructive" });
     }
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(reports.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentReports = reports.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   if (loading) {
@@ -374,75 +390,118 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {reports.slice(0, 10).map((report) => (
-                  <div 
-                    key={report.id} 
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="font-medium">
-                          {report.conditionType?.replace('_', ' ').toUpperCase()}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          by @{report.user?.username} • {new Date(report.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge variant={report.isResolved ? "default" : "outline"}>
-                        {report.isResolved ? 'Resolved' : 'Pending'}
-                      </Badge>
-                      <Badge 
-                        className={
-                          report.severityLevel === 'CRITICAL' ? 'bg-red-700' :
-                          report.severityLevel === 'HIGH' ? 'bg-red-500' :
-                          report.severityLevel === 'MEDIUM' ? 'bg-yellow-500' :
-                          'bg-green-500'
-                        }
-                      >
-                        {report.severityLevel}
-                      </Badge>
-                      {report.status === 'flagged' && (
-                        <Badge variant="destructive">Flagged</Badge>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/app/reports/${report.id}`)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {!report.isResolved && (
-                        <Button 
-                          variant="default" 
-                          size="sm"
-                          onClick={() => handleResolveReport(report.id)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          Resolve
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleFlagReport(report.id)}
-                        disabled={report.status === 'flagged'}
-                      >
-                        <Flag className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => handleRemoveReport(report.id)}
-                      >
-                        Remove
-                      </Button>
-                    </div>
+                {currentReports.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No reports found
                   </div>
-                ))}
+                ) : (
+                  currentReports.map((report) => (
+                    <div 
+                      key={report.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="font-medium">
+                            {report.conditionType?.replace('_', ' ').toUpperCase()}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            by @{report.user?.username} • {new Date(report.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant={report.isResolved ? "default" : "outline"}>
+                          {report.isResolved ? 'Resolved' : 'Pending'}
+                        </Badge>
+                        <Badge 
+                          className={
+                            report.severityLevel === 'CRITICAL' ? 'bg-red-700' :
+                            report.severityLevel === 'HIGH' ? 'bg-red-500' :
+                            report.severityLevel === 'MEDIUM' ? 'bg-yellow-500' :
+                            'bg-green-500'
+                          }
+                        >
+                          {report.severityLevel}
+                        </Badge>
+                        {report.status === 'flagged' && (
+                          <Badge variant="destructive">Flagged</Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => navigate(`/app/reports/${report.id}`)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {!report.isResolved && (
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => handleResolveReport(report.id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            Resolve
+                          </Button>
+                        )}
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleFlagReport(report.id)}
+                          disabled={report.status === 'flagged'}
+                        >
+                          <Flag className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleRemoveReport(report.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(endIndex, reports.length)} of {reports.length} reports
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

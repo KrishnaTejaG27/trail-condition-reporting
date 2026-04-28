@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Clock, Loader2, Eye } from 'lucide-react';
+import { MapPin, Clock, Eye, FileText, Bell } from 'lucide-react';
 import { api, handleApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/EmptyState';
+import { useSocket } from '@/hooks/useSocket';
 
 interface Report {
   id: string;
@@ -31,9 +34,62 @@ interface Report {
 export default function Reports() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  const { token } = useAuthStore();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const { token, user } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { joinReports, joinUser, onReportCreated, onReportUpdated, onReportDeleted, onVoteUpdated, onNotification } = useSocket();
+
+  // Real-time socket listeners
+  useEffect(() => {
+    if (!token || !user) return;
+
+    joinReports();
+    joinUser(user.id);
+
+    const unsubscribeCreated = onReportCreated((newReport) => {
+      console.log('🆕 Reports page: New report', newReport);
+      setReports(prev => [newReport, ...prev]);
+      toast({
+        title: "🚨 New Report",
+        description: `${newReport.conditionType} reported by ${newReport.user?.firstName || 'someone'}`,
+      });
+    });
+
+    const unsubscribeUpdated = onReportUpdated((updatedReport) => {
+      console.log('🔄 Reports page: Report updated', updatedReport);
+      setReports(prev => prev.map(r => r.id === updatedReport.id ? updatedReport : r));
+    });
+
+    const unsubscribeDeleted = onReportDeleted(({ id }) => {
+      console.log('🗑️ Reports page: Report deleted', id);
+      setReports(prev => prev.filter(r => r.id !== id));
+    });
+
+    const unsubscribeVote = onVoteUpdated(({ reportId, voteCount }) => {
+      console.log('👍 Reports page: Vote updated', reportId, voteCount);
+      setReports(prev => prev.map(r => 
+        r.id === reportId ? { ...r, _count: { ...r._count, votes: voteCount } } : r
+      ));
+    });
+
+    const unsubscribeNotification = onNotification((notification) => {
+      console.log('🔔 Reports page: Notification', notification);
+      setUnreadNotifications(prev => prev + 1);
+      toast({
+        title: `🔔 ${notification.title}`,
+        description: notification.message,
+      });
+    });
+
+    return () => {
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+      unsubscribeVote();
+      unsubscribeNotification();
+    };
+  }, [token, user, joinReports, joinUser, onReportCreated, onReportUpdated, onReportDeleted, onVoteUpdated, onNotification, toast]);
 
   useEffect(() => {
     fetchReports();
@@ -75,8 +131,37 @@ export default function Reports() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="mb-6">
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-full mb-3" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -84,24 +169,39 @@ export default function Reports() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">All Reports</h1>
-        <p className="text-muted-foreground">View all trail condition reports</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">All Reports</h1>
+          <p className="text-muted-foreground">View all trail condition reports</p>
+        </div>
+        <div className="relative">
+          <Bell className="h-6 w-6 text-muted-foreground" />
+          {unreadNotifications > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              {unreadNotifications > 99 ? '99+' : unreadNotifications}
+            </span>
+          )}
+        </div>
       </div>
 
       {reports.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground mb-4">No reports found</p>
-            <Button onClick={() => navigate('/app/reports/new')}>
-              Create First Report
-            </Button>
-          </CardContent>
+          <EmptyState
+            icon={FileText}
+            title="No reports yet"
+            description="Be the first to report a trail condition and help keep the community safe!"
+            actionLabel="Create First Report"
+            onAction={() => navigate('/app/reports/new')}
+          />
         </Card>
       ) : (
         <div className="grid gap-4">
           {reports.map((report) => (
-            <Card key={report.id} className="hover:shadow-md transition-shadow">
+            <Card 
+              key={report.id} 
+              className="hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
+              onClick={() => navigate(`/app/reports/${report.id}`)}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -115,14 +215,9 @@ export default function Reports() {
                       <Badge variant="outline">Resolved</Badge>
                     )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/app/reports/${report.id}`)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View
-                  </Button>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Eye className="h-5 w-5 text-muted-foreground" />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

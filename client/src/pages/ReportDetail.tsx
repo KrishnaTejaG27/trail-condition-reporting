@@ -253,14 +253,26 @@ const ReportDetail = () => {
                   <div>
                     <h3 className="font-medium mb-2">Photos</h3>
                     <div className="grid grid-cols-2 gap-4">
-                      {report.photos.map((photo) => (
-                        <img 
-                          key={photo.id} 
-                          src={photo.url} 
-                          alt="Report photo" 
-                          className="aspect-square object-cover rounded-lg"
-                        />
-                      ))}
+                      {report.photos.map((photo) => {
+                        // Convert relative URLs to use Vite proxy
+                        const photoUrl = photo.url?.startsWith('http') 
+                          ? photo.url 
+                          : photo.url?.startsWith('/uploads/')
+                          ? photo.url  // Use relative path, Vite proxy will handle it
+                          : photo.url;
+                        
+                        return photoUrl ? (
+                          <img 
+                            key={photo.id} 
+                            src={photoUrl} 
+                            alt="Report photo" 
+                            className="aspect-square object-cover rounded-lg"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : null;
+                      })}
                     </div>
                   </div>
                 )}

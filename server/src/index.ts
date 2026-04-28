@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import rateLimit from 'express-rate-limit';
+import { createServer } from 'http';
+import { initializeSocket } from '@/services/socketService';
 
 // Using mock auth routes for testing without database
 import authRoutes from '@/routes/mockAuth';
@@ -16,6 +18,9 @@ import adminRoutes from '@/routes/admin';
 import userStatsRoutes from '@/routes/userStats';
 import trailImportRoutes from '@/routes/trailImport';
 import pushRoutes from '@/routes/push';
+import weatherRoutes from '@/routes/weather';
+import aiClassificationRoutes from '@/routes/aiClassification';
+import inAppNotificationRoutes from '@/routes/inAppNotifications';
 import { errorHandler } from '@/middleware/errorHandler';
 import { notFound } from '@/middleware/notFound';
 import { seedTrails } from '@/controllers/trailController';
@@ -66,9 +71,16 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userStatsRoutes);
 app.use('/api/trails/import', trailImportRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/weather', weatherRoutes);
+app.use('/api/ai', aiClassificationRoutes);
+app.use('/api/in-app-notifications', inAppNotificationRoutes);
 
-// Seed sample trails on startup
-seedTrails();
+// Seed sample trails on startup (with error handling for mock mode)
+try {
+  seedTrails();
+} catch (error) {
+  console.log('Skipping trail seeding (likely running in mock mode without database)');
+}
 
 // Error handling middleware
 app.use(notFound);
@@ -87,11 +99,18 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
+// Create HTTP server
+const httpServer = createServer(app);
+
+// Initialize Socket.IO
+initializeSocket(httpServer, FRONTEND_URL);
+
 // Start server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 API Base: http://localhost:${PORT}/api`);
+  console.log(`🔌 WebSocket ready`);
 });
 
 export default app;

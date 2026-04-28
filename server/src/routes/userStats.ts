@@ -35,6 +35,9 @@ router.get('/me/stats', protect, async (req, res) => {
         })
       ]);
 
+      const calculatedReputation = reportsCount * 10 + totalVotesOnReports * 2 + commentsMade;
+      console.log(`Profile stats for user ${userId}: reports=${reportsCount}, votes=${totalVotesOnReports}, comments=${commentsMade}, reputation=${calculatedReputation}`);
+      
       return res.json({
         success: true,
         data: {
@@ -42,7 +45,7 @@ router.get('/me/stats', protect, async (req, res) => {
           verifications: totalVotesOnReports,
           comments: commentsMade,
           resolved: resolvedReports,
-          reputation: reportsCount * 10 + totalVotesOnReports * 2 + commentsMade
+          reputation: calculatedReputation
         }
       });
     } catch (dbError) {
@@ -61,6 +64,8 @@ router.get('/me/stats', protect, async (req, res) => {
       const commentsMade = mockComments.filter(c => c.userId === userId).length;
       
       const resolvedReports = userReports.filter(r => r.isResolved).length;
+      const mockCalculatedReputation = reportsCount * 10 + totalVotesOnReports * 2 + commentsMade;
+      console.log(`Profile MOCK for user ${userId}: reports=${reportsCount}, votes=${totalVotesOnReports}, comments=${commentsMade}, reputation=${mockCalculatedReputation}`);
 
       return res.json({
         success: true,
@@ -69,7 +74,7 @@ router.get('/me/stats', protect, async (req, res) => {
           verifications: totalVotesOnReports,
           comments: commentsMade,
           resolved: resolvedReports,
-          reputation: reportsCount * 10 + totalVotesOnReports * 2 + commentsMade
+          reputation: mockCalculatedReputation
         },
         message: 'Stats fetched (mock)'
       });

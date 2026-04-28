@@ -1,51 +1,88 @@
 import { Request, Response } from 'express';
 import { prisma } from '@/index';
+import { mockReports as dbMockReports } from '@/mockDb';
+
+// Local mock trails for fallback
+export const dbMockTrails = [
+  {
+    id: 'trail_1',
+    name: 'Mist Trail',
+    description: 'Steep trail leading to Vernal Fall',
+    difficulty: 'HARD',
+    length: 3.0,
+    location: 'Yosemite Valley',
+    elevationGain: 1000,
+    estimatedTime: '3-4 hours',
+    features: ['Waterfall', 'Stairs', 'River crossing'],
+    surfaceTypes: ['Dirt', 'Rock'],
+    status: 'OPEN',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'trail_2',
+    name: 'Valley Loop Trail',
+    description: 'Easy loop around Yosemite Valley floor',
+    difficulty: 'EASY',
+    length: 7.2,
+    location: 'Yosemite Valley',
+    elevationGain: 50,
+    estimatedTime: '2-4 hours',
+    features: ['Views', 'Wildlife', 'Flat'],
+    surfaceTypes: ['Paved', 'Dirt'],
+    status: 'OPEN',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'trail_3',
+    name: 'Mirror Lake Loop',
+    description: 'Peaceful walk to seasonal Mirror Lake',
+    difficulty: 'EASY',
+    length: 2.0,
+    location: 'Tenaya Creek',
+    elevationGain: 100,
+    estimatedTime: '1-2 hours',
+    features: ['Lake views', 'Reflection', 'Nature'],
+    surfaceTypes: ['Paved', 'Dirt'],
+    status: 'OPEN',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'trail_4',
+    name: 'Sentinel Dome Trail',
+    description: 'Short hike to panoramic dome views',
+    difficulty: 'MODERATE',
+    length: 2.2,
+    location: 'Glacier Point Road',
+    elevationGain: 400,
+    estimatedTime: '1-2 hours',
+    features: ['360° Views', 'Granite dome', 'Sunset'],
+    surfaceTypes: ['Dirt', 'Granite'],
+    status: 'OPEN',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  },
+];
 
 // Get all trails (with optional filtering)
 export const getTrails = async (req: Request, res: Response) => {
   try {
-    // Return mock trails for demo when no database
-    const mockTrails = [
-      {
-        id: 'trail_1',
-        name: 'Mist Trail',
-        description: 'Steep trail leading to Vernal Fall',
-        park: { name: 'Yosemite National Park' },
-        _count: { reports: 2 }
-      },
-      {
-        id: 'trail_2',
-        name: 'Mirror Lake Loop',
-        description: 'Easy loop around Mirror Lake',
-        park: { name: 'Yosemite National Park' },
-        _count: { reports: 0 }
-      },
-      {
-        id: 'trail_3',
-        name: 'Half Dome Trail',
-        description: 'Challenging trail to Half Dome summit',
-        park: { name: 'Yosemite National Park' },
-        _count: { reports: 5 }
-      },
-      {
-        id: 'trail_4',
-        name: 'Lower Yosemite Fall Trail',
-        description: 'Paved trail to the base of Lower Yosemite Fall',
-        park: { name: 'Yosemite National Park' },
-        _count: { reports: 1 }
-      },
-      {
-        id: 'trail_5',
-        name: 'Sentinel Dome Trail',
-        description: 'Short hike to panoramic views',
-        park: { name: 'Yosemite National Park' },
-        _count: { reports: 0 }
+    // Return mock trails for demo when no database - map from module-level dbMockTrails
+    const mockTrails = dbMockTrails.map(t => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      park: { name: 'Yosemite National Park' },
+      _count: { 
+        reports: dbMockReports.filter((r: any) => r.trailId === t.id && r.isActive).length 
       }
-    ];
+    }));
 
-    res.json({
+    return res.json({
       success: true,
-      data: { trails: mockTrails },
+      data: { trails: mockTrails }
     });
   } catch (error) {
     console.error('Get trails error:', error);
@@ -105,6 +142,40 @@ export const getTrail = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Get trail error:', error);
+    
+    // Try mock data fallback
+    try {
+      const mockTrail = dbMockTrails.find((t: any) => t.id === req.params.id);
+      if (mockTrail) {
+        // Get mock reports for this trail
+        const trailReports = dbMockReports
+          .filter((r: any) => r.trailId === mockTrail.id && r.isActive)
+          .slice(0, 5)
+          .map((r: any) => ({
+            id: r.id,
+            conditionType: r.conditionType,
+            severityLevel: r.severityLevel,
+            description: r.description,
+            isResolved: r.isResolved,
+            createdAt: r.createdAt,
+          }));
+          
+        return res.json({
+          success: true,
+          data: { 
+            trail: {
+              ...mockTrail,
+              reports: trailReports,
+              _count: { reports: trailReports.length }
+            }
+          },
+          message: 'Trail retrieved (mock)'
+        });
+      }
+    } catch (mockError) {
+      console.log('Mock fallback failed for getTrail');
+    }
+    
     res.status(500).json({
       success: false,
       error: 'Failed to get trail',

@@ -91,19 +91,30 @@ router.post('/unsubscribe', protect, async (req: AuthRequest, res) => {
 // Send test notification to current user
 router.post('/test', protect, async (req: AuthRequest, res) => {
   try {
+    console.log('Test notification request for user:', req.user!.id);
     const payload = NotificationTemplates.reportValidated(3);
-    const sent = await sendNotificationToUser(req.user!.id, payload);
+    console.log('Payload:', payload);
     
-    res.json({
-      success: true,
-      data: { sent },
-      message: `Test notification sent to ${sent} device(s)`,
-    });
-  } catch (error) {
+    const sent = await sendNotificationToUser(req.user!.id, payload);
+    console.log('Notifications sent:', sent);
+    
+    if (sent > 0) {
+      res.json({
+        success: true,
+        data: { sent },
+        message: `Test notification sent to ${sent} device(s)`,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: 'No active subscription found. Please re-enable push notifications.',
+      });
+    }
+  } catch (error: any) {
     console.error('Test notification error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to send test notification',
+      error: error?.message || 'Failed to send test notification',
     });
   }
 });

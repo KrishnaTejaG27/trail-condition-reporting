@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, MapPin, TreePine, Waves, Mountain, Camera, X, Loader2, Upload } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, MapPin, TreePine, Waves, Mountain, Camera, X, Loader2, Upload, Route } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api, handleApiResponse } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +40,13 @@ const CreateReport = () => {
   const [selectedSeverity, setSelectedSeverity] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<any>(null);
+  const [loadingAi, setLoadingAi] = useState(false);
+  
+  // Trail state
+  const [trails, setTrails] = useState<Array<{ id: string; name: string; location: string; difficulty: string }>>([]);
+  const [selectedTrail, setSelectedTrail] = useState<string>('');
+  const [loadingTrails, setLoadingTrails] = useState(false);
   
   // Location state
   const [, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -69,7 +77,25 @@ const CreateReport = () => {
       navigate('/login');
       return;
     }
+
+    // Fetch available trails
+    fetchTrails();
   }, [isAuthenticated, token, navigate, toast]);
+
+  const fetchTrails = async () => {
+    setLoadingTrails(true);
+    try {
+      const response = await api.trails.getAll();
+      const data = await handleApiResponse(response);
+      if (data.success && data.data?.trails) {
+        setTrails(data.data.trails);
+      }
+    } catch (error) {
+      console.error('Error fetching trails:', error);
+    } finally {
+      setLoadingTrails(false);
+    }
+  };
 
   // Get user location on mount
   useEffect(() => {
@@ -114,6 +140,32 @@ const CreateReport = () => {
       photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
     };
   }, [photoPreviewUrls]);
+
+  // AI Classification - suggest severity based on description
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (description.length > 10 && selectedCondition) {
+        setLoadingAi(true);
+        api.ai.classifyHazard(description, selectedCondition)
+          .then(handleApiResponse)
+          .then(res => {
+            if (res.success) {
+              setAiSuggestion(res.data);
+            }
+          })
+          .catch(error => {
+            console.log('AI classification failed (non-critical):', error);
+          })
+          .finally(() => {
+            setLoadingAi(false);
+          });
+      } else {
+        setAiSuggestion(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(debounceTimer);
+  }, [description, selectedCondition]);
 
   const handleGetCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -215,6 +267,7 @@ const CreateReport = () => {
           type: "Point",
           coordinates: [selectedLocation.lng, selectedLocation.lat]
         },
+        trailId: selectedTrail || undefined,
       };
 
       console.log('Submitting report:', reportData);
@@ -250,9 +303,23 @@ const CreateReport = () => {
       console.error('Error type:', typeof error);
       console.error('Error message:', error instanceof Error ? error.message : 'No message');
       
+      // Log additional details for debugging
+      if (error instanceof Error) {
+        console.error('Error stack:', error.stack);
+      }
+      
+      // Check if it's a network error
+      const errorMsg = error instanceof Error ? error.message : "Failed to submit report";
+      const isNetworkError = errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch');
+      const isServerError = errorMsg.includes('Server returned non-JSON');
+      
       toast({
         title: "Submission Failed",
-        description: error instanceof Error ? error.message : "Failed to submit report",
+        description: isNetworkError 
+          ? "Server connection failed. Please check if the backend is running."
+          : isServerError
+          ? "Server error. Please try again without selecting a trail."
+          : errorMsg,
         variant: "destructive",
       });
     } finally {
@@ -368,6 +435,67 @@ const CreateReport = () => {
               <p className="text-xs text-muted-foreground">
                 Tip: If location doesn't work, make sure you've allowed location access in your browser settings, then click "Use My Location" above.
               </p>
+
+              {/* Trail Selection */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  <Route className="h-4 w-4 inline mr-2" />
+                  Which Trail? (Optional)
+                </p>
+                {loadingTrails ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading trails...
+                  </div>
+                ) : trails.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2">
+                    {trails.map((trail) => (
+                      <button
+                        key={trail.id}
+                        onClick={() => setSelectedTrail(selectedTrail === trail.id ? '' : trail.id)}
+                        className={`p-3 rounded-lg border-2 text-left transition-all ${
+                          selectedTrail === trail.id
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{trail.name}</p>
+                            <p className="text-xs text-muted-foreground">{trail.location}</p>
+                          </div>
+                          <Badge 
+                            className={
+                              trail.difficulty === 'EASY' ? 'bg-green-500' :
+                              trail.difficulty === 'MODERATE' ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }
+                          >
+                            {trail.difficulty}
+                          </Badge>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No trails available. You can still report without selecting a trail.
+                  </p>
+                )}
+                {selectedTrail && (
+                  <p className="text-xs text-muted-foreground">
+                    Selected: {trails.find(t => t.id === selectedTrail)?.name}
+                    <button 
+                      onClick={() => setSelectedTrail('')}
+                      className="ml-2 text-primary hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </p>
+                )}
+              </div>
+
+              <hr className="border-border" />
 
               {/* Real Map */}
               <div className="h-64 rounded-lg overflow-hidden border">
@@ -529,12 +657,39 @@ const CreateReport = () => {
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full p-3 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   rows={4}
                   placeholder="Tell others more about this hazard..."
                 />
               </div>
-              
+
+              {/* AI Classification Suggestion */}
+              {aiSuggestion && (
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
+                        🤖 AI Suggested Severity: {aiSuggestion.suggestedSeverity.toUpperCase()}
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-300 mb-2">
+                        Confidence: {Math.round(aiSuggestion.confidence)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {aiSuggestion.reasoning}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedSeverity(aiSuggestion.suggestedSeverity.toLowerCase())}
+                      className="ml-4"
+                    >
+                      Apply Suggestion
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Photo Upload */}
               <div>
                 <label className="block text-sm font-medium mb-2">

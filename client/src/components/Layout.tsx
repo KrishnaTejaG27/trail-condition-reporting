@@ -10,14 +10,45 @@ import {
   Menu,
   X,
   Shield,
-  Route
+  Route,
+  Bell,
+  BarChart3
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Layout = () => {
-  const { user, logout } = useAuthStore();
+  const { user, logout, token } = useAuthStore();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await fetch('/api/in-app-notifications?unreadOnly=true', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUnreadCount(data.data.notifications.length);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount();
+      // Poll for new notifications every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   const navigation = [
     { name: 'Map', href: '/app', icon: Map },
@@ -26,7 +57,10 @@ const Layout = () => {
     { name: 'Create Report', href: '/app/reports/create', icon: Plus },
     { name: 'Profile', href: '/app/profile', icon: User },
     ...(user?.role === 'ADMIN' || user?.role === 'MODERATOR' 
-      ? [{ name: 'Admin', href: '/app/admin', icon: Shield }]
+      ? [
+          { name: 'Admin', href: '/app/admin', icon: Shield },
+          { name: 'Analytics', href: '/app/analytics', icon: BarChart3 }
+        ]
       : []),
   ];
 
@@ -70,7 +104,8 @@ const Layout = () => {
             </div>
 
             <div className="mt-8 pt-8 border-t">
-              <div className="flex items-center space-x-3 px-3 py-2">
+              <ThemeToggle />
+              <div className="flex items-center space-x-3 px-3 py-2 mt-2">
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
                   {user?.username?.charAt(0).toUpperCase()}
                 </div>
@@ -79,6 +114,19 @@ const Layout = () => {
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </div>
+              <Button
+                variant="ghost"
+                className="w-full justify-start mt-2"
+                onClick={() => setIsNotificationOpen(true)}
+              >
+                <Bell className="h-4 w-4 mr-3" />
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </Button>
               <Button
                 variant="ghost"
                 className="w-full justify-start mt-2"
@@ -106,13 +154,29 @@ const Layout = () => {
               <Map className="h-6 w-6 text-primary" />
               <span className="text-xl font-bold">Trail Safety</span>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </Button>
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsNotificationOpen(true)}
+                className="relative"
+              >
+                <Bell className="h-6 w-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -157,7 +221,8 @@ const Layout = () => {
               </div>
 
               <div className="mt-8 pt-8 border-t">
-                <div className="flex items-center space-x-3 px-3 py-2">
+                <ThemeToggle />
+                <div className="flex items-center space-x-3 px-3 py-2 mt-2">
                   <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
                     {user?.username?.charAt(0).toUpperCase()}
                   </div>
@@ -210,6 +275,15 @@ const Layout = () => {
           </div>
         </div>
       </div>
+
+      {/* Notification Center */}
+      <NotificationCenter
+        isOpen={isNotificationOpen}
+        onClose={() => {
+          setIsNotificationOpen(false);
+          fetchUnreadCount();
+        }}
+      />
     </div>
   );
 };

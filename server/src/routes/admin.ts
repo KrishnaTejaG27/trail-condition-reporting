@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { protect } from '@/middleware/auth';
 import { prisma } from '@/index';
-import { mockReports, mockUsers, updateUser as updateUserInMock, deleteReport as deleteReportFromMock } from '@/mockDb';
+import { mockUsers, mockReports } from '@/mockDbFile';
+import { notifyReportResolved } from '@/services/inAppNotificationService';
 
 const router = Router();
 
@@ -22,20 +23,14 @@ const checkAdminRole = (req: any, res: any, next: any) => {
 router.use(checkAdminRole);
 
 /**
- * Get dashboard statistics
+ * Get stats
  */
 router.get('/stats', async (req, res) => {
   try {
+    console.log('GET /api/admin/stats - fetching stats');
     // Try database first
     try {
-      const [
-        totalUsers,
-        totalReports,
-        activeReports,
-        resolvedReports,
-        reportsThisWeek,
-        reportsThisMonth
-      ] = await Promise.all([
+      const [totalUsers, totalReports, activeReports, resolvedReports, reportsThisWeek, reportsThisMonth] = await Promise.all([
         prisma.user.count(),
         prisma.report.count(),
         prisma.report.count({ where: { isResolved: false } }),
@@ -52,6 +47,7 @@ router.get('/stats', async (req, res) => {
         })
       ]);
 
+      console.log('Database stats fetched');
       return res.json({
         success: true,
         data: {
@@ -153,6 +149,7 @@ router.get('/users', async (req, res) => {
  */
 router.get('/reports', async (req, res) => {
   try {
+    console.log('GET /api/admin/reports - fetching reports');
     // Try database first
     try {
       const reports = await prisma.report.findMany({
@@ -164,13 +161,14 @@ router.get('/reports', async (req, res) => {
         orderBy: { createdAt: 'desc' }
       });
 
+      console.log('Database reports fetched:', reports.length);
       return res.json({
         success: true,
         data: { reports }
       });
     } catch (dbError) {
       // Mock fallback
-      console.log('Using mock data for reports');
+      console.log('Using mock data for reports, error:', dbError);
       
       const enrichedReports = mockReports.map(r => {
         const user = mockUsers.find(u => u.id === r.userId);
@@ -185,6 +183,7 @@ router.get('/reports', async (req, res) => {
         };
       });
 
+      console.log('Mock reports fetched:', enrichedReports.length);
       return res.json({
         success: true,
         data: { reports: enrichedReports },
@@ -232,7 +231,6 @@ router.post('/users/:id/ban', async (req, res) => {
       }
 
       mockUsers[userIndex] = { ...mockUsers[userIndex], isActive: false };
-      updateUserInMock(id, { isActive: false });
 
       return res.json({
         success: true,
@@ -260,7 +258,7 @@ router.put('/reports/:id/flag', async (req, res) => {
     try {
       const report = await prisma.report.update({
         where: { id },
-        data: { status: 'flagged' }
+        data: { status: 'FLAGGED' as any }
       });
 
       return res.json({
@@ -316,6 +314,11 @@ router.put('/reports/:id/resolve', async (req, res) => {
         }
       });
 
+      // Notify report owner about resolution
+      if (report.userId !== adminId) {
+        await notifyReportResolved(id, report.userId, adminId);
+      }
+
       return res.json({
         success: true,
         data: { report },
@@ -333,12 +336,20 @@ router.put('/reports/:id/resolve', async (req, res) => {
         });
       }
 
+      const report = mockReports[reportIndex];
       mockReports[reportIndex] = { 
-        ...mockReports[reportIndex], 
+        ...report, 
         isResolved: true,
         resolvedAt: new Date().toISOString(),
         resolvedBy: adminId
       };
+
+      // Notify report owner about resolution (mock mode)
+      console.log('Admin resolving report - checking notification trigger:', { reportId: id, adminId, reportOwnerId: report.userId });
+      if (report.userId !== adminId) {
+        console.log('Triggering notification for report resolution');
+        await notifyReportResolved(id, report.userId, adminId);
+      }
 
       return res.json({
         success: true,
@@ -376,13 +387,15 @@ router.delete('/reports/:id', async (req, res) => {
       // Mock fallback
       console.log('Using mock data for remove report');
       
-      const deleted = deleteReportFromMock(id);
-      if (!deleted) {
+      const reportIndex = mockReports.findIndex(r => r.id === id);
+      if (reportIndex === -1) {
         return res.status(404).json({
           success: false,
           error: 'Report not found'
         });
       }
+
+      mockReports.splice(reportIndex, 1);
 
       return res.json({
         success: true,

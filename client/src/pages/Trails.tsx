@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,10 +12,22 @@ import {
   TrendingUp,
   Loader2,
   Search,
-  Plus
+  Plus,
+  AlertTriangle,
+  CheckCircle,
+  ArrowRight,
+  Eye
 } from 'lucide-react';
 import { api, handleApiResponse } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { formatDistanceToNow } from 'date-fns';
+
+interface Report {
+  id: string;
+  severityLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+  isResolved: boolean;
+  createdAt: string;
+}
 
 interface Trail {
   id: string;
@@ -30,6 +42,7 @@ interface Trail {
   surfaceTypes: string[];
   status: string;
   createdAt: string;
+  reports?: Report[];
 }
 
 export default function Trails() {
@@ -55,7 +68,29 @@ export default function Trails() {
       const data = await handleApiResponse(response);
       
       if (data.success) {
-        setTrails(data.data?.trails || []);
+        const trailsData = data.data?.trails || [];
+        
+        // Fetch recent reports for each trail to show conditions
+        const trailsWithReports = await Promise.all(
+          trailsData.map(async (trail: Trail) => {
+            try {
+              const reportsResponse = await api.reports.getAll({ 
+                trailId: trail.id,
+                limit: 5,
+                isResolved: false
+              });
+              const reportsData = await handleApiResponse(reportsResponse);
+              return {
+                ...trail,
+                reports: reportsData.data?.reports || []
+              };
+            } catch {
+              return { ...trail, reports: [] };
+            }
+          })
+        );
+        
+        setTrails(trailsWithReports);
       }
     } catch (error) {
       console.error('Error fetching trails:', error);
@@ -66,6 +101,42 @@ export default function Trails() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getTrailStatus = (reports: Report[] = []) => {
+    const activeReports = reports.filter(r => !r.isResolved);
+    const highSeverity = activeReports.filter(r => r.severityLevel === 'HIGH').length;
+    const mediumSeverity = activeReports.filter(r => r.severityLevel === 'MEDIUM').length;
+    const lastReport = activeReports[0];
+    
+    if (highSeverity > 0) return { 
+      text: '⚠️ Hazards Reported', 
+      color: 'bg-red-500', 
+      icon: AlertTriangle,
+      count: activeReports.length,
+      lastUpdate: lastReport?.createdAt
+    };
+    if (mediumSeverity > 0) return { 
+      text: '⚡ Caution', 
+      color: 'bg-yellow-500', 
+      icon: AlertTriangle,
+      count: activeReports.length,
+      lastUpdate: lastReport?.createdAt
+    };
+    if (activeReports.length > 0) return { 
+      text: 'ℹ️ Minor Issues', 
+      color: 'bg-blue-500', 
+      icon: AlertTriangle,
+      count: activeReports.length,
+      lastUpdate: lastReport?.createdAt
+    };
+    return { 
+      text: '✅ Clear', 
+      color: 'bg-green-500', 
+      icon: CheckCircle,
+      count: 0,
+      lastUpdate: null
+    };
   };
 
   const filterTrails = () => {
@@ -162,71 +233,94 @@ export default function Trails() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTrails.map((trail) => (
-            <Card key={trail.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{trail.name}</CardTitle>
-                    <CardDescription className="flex items-center gap-1 mt-1">
-                      <MapPin className="h-3 w-3" />
-                      {trail.location}
-                    </CardDescription>
+          {filteredTrails.map((trail) => {
+            const status = getTrailStatus(trail.reports);
+            return (
+              <Card 
+                key={trail.id} 
+                className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-primary/20"
+                onClick={() => navigate(`/app/trails/${trail.id}`)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg group-hover:text-primary transition-colors truncate">
+                        {trail.name}
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-1 mt-1">
+                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{trail.location}</span>
+                      </CardDescription>
+                    </div>
+                    <Badge className={getDifficultyColor(trail.difficulty)}>
+                      {trail.difficulty}
+                    </Badge>
                   </div>
-                  <Badge className={getDifficultyColor(trail.difficulty)}>
-                    {trail.difficulty}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                  {trail.description}
-                </p>
+                  
+                  {/* Live Condition Badge */}
+                  <div className="mt-3">
+                    <Badge className={`${status.color} text-white text-xs`}>
+                      <status.icon className="h-3 w-3 mr-1" />
+                      {status.text}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                    {trail.description}
+                  </p>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  <div className="text-center p-2 bg-muted rounded">
-                    <Route className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <p className="text-sm font-medium">{trail.length} mi</p>
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="text-center p-2 bg-muted rounded">
+                      <Route className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                      <p className="text-sm font-medium">{trail.length} mi</p>
+                    </div>
+                    <div className="text-center p-2 bg-muted rounded">
+                      <TrendingUp className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                      <p className="text-sm font-medium">{trail.elevationGain} ft</p>
+                    </div>
+                    <div className="text-center p-2 bg-muted rounded">
+                      <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                      <p className="text-sm font-medium">{trail.estimatedTime}</p>
+                    </div>
                   </div>
-                  <div className="text-center p-2 bg-muted rounded">
-                    <TrendingUp className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <p className="text-sm font-medium">{trail.elevationGain} ft</p>
-                  </div>
-                  <div className="text-center p-2 bg-muted rounded">
-                    <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <p className="text-sm font-medium">{trail.estimatedTime}</p>
-                  </div>
-                </div>
 
-                {/* Features */}
-                {trail.features && trail.features.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {trail.features.slice(0, 3).map((feature, idx) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
-                        {feature}
-                      </Badge>
-                    ))}
-                    {trail.features.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{trail.features.length - 3} more
-                      </Badge>
-                    )}
-                  </div>
-                )}
+                  {/* Last Updated */}
+                  {status.lastUpdate && (
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Last report: {formatDistanceToNow(new Date(status.lastUpdate))} ago
+                    </p>
+                  )}
 
-                {/* Actions */}
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => navigate(`/app/reports/create?trailId=${trail.id}`)}
-                >
-                  <Mountain className="h-4 w-4 mr-2" />
-                  Report Issue
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/app/reports/create?trailId=${trail.id}`);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Report
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="px-3"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/app/trails/${trail.id}`);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
